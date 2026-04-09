@@ -92,13 +92,12 @@ import { useSocket } from "@/hooks/useSocket";
 
 export default function Home() {
   const { user, setUser, fetchCollections } = useTechPackStore();
-  const [initializing, setInitializing] = React.useState(true);
+  const [initializing, setInitializing] = React.useState(false);
   
   // Start socket connection when logged in
   useSocket();
 
   React.useEffect(() => {
-    // Initial check
     // Initial check with timeout to prevent hanging on Vercel
     const initAuth = async () => {
       const timeoutPromise = new Promise((_, reject) => 
@@ -129,39 +128,15 @@ export default function Home() {
       setUser(session?.user ?? null);
       if (session?.user) {
         await fetchCollections();
-      } else {
-        // Clear local collections if needed or let store handle it
       }
     });
 
     return () => subscription.unsubscribe();
   }, [setUser, fetchCollections]);
 
-  if (initializing) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-6 p-4 text-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-[#0b1912]" />
-          <p className="text-xs font-bold uppercase tracking-widest text-[#0b1912]/40">Beveiligde verbinding maken...</p>
-        </div>
-        
-        {/* Noodknop / Fail-safe button */}
-        <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500 fill-mode-both">
-          <p className="text-[10px] text-slate-400 mb-2 uppercase tracking-tight">Duurt dit te lang?</p>
-          <button 
-            onClick={() => setInitializing(false)}
-            className="px-6 py-2.5 rounded-xl border border-slate-200 text-[#0b1912] text-[10px] font-black uppercase tracking-widest hover:bg-white hover:shadow-lg transition-all active:scale-95"
-          >
-            Direct naar inloggen
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+      <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4">
         <LoginForm />
       </div>
     );
