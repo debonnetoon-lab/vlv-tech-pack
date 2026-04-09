@@ -4,6 +4,29 @@
 -- ============================================================
 
 -- ─────────────────────────────────────────────
+--  CLEANUP (Verwijdert testdata en oude structuur)
+-- ─────────────────────────────────────────────
+DROP PUBLICATION IF EXISTS supabase_realtime;
+DROP TABLE IF EXISTS public.shares CASCADE;
+DROP TABLE IF EXISTS public.activity_log CASCADE;
+DROP TABLE IF EXISTS public.field_locks CASCADE;
+DROP TABLE IF EXISTS public.article_images CASCADE;
+DROP TABLE IF EXISTS public.pantone_colors CASCADE;
+DROP TABLE IF EXISTS public.artwork_placements CASCADE;
+DROP TABLE IF EXISTS public.sizes CASCADE;
+DROP TABLE IF EXISTS public.articles CASCADE;
+DROP TABLE IF EXISTS public.collections CASCADE;
+DROP TABLE IF EXISTS public.organization_members CASCADE;
+DROP TABLE IF EXISTS public.organizations CASCADE;
+DROP TABLE IF EXISTS public.profiles CASCADE;
+
+DROP TYPE IF EXISTS garment_type CASCADE;
+DROP TYPE IF EXISTS gender_type CASCADE;
+DROP TYPE IF EXISTS fit_type CASCADE;
+DROP TYPE IF EXISTS label_position CASCADE;
+DROP TYPE IF EXISTS packaging_type CASCADE;
+
+-- ─────────────────────────────────────────────
 --  EXTENSIES
 -- ─────────────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
