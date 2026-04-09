@@ -99,7 +99,9 @@ export const useDataStore = create<DataStore>()(
               sizes (*),
               artwork_placements (*),
               pantone_colors (*),
-              article_images (*)
+              article_images (*),
+              bom_items (*),
+              measurement_points (*, measurement_values (*))
             )
           `)
           .order('created_at', { ascending: false });
@@ -115,7 +117,12 @@ export const useDataStore = create<DataStore>()(
               images: art.article_images || [],
               placements: art.artwork_placements || [],
               colors: art.pantone_colors || [],
-              sizes: art.sizes || []
+              sizes: art.sizes || [],
+              bom_items: art.bom_items || [],
+              measurement_points: (art.measurement_points || []).map((mp: any) => ({
+                ...mp,
+                values: mp.measurement_values || []
+              }))
             }))
           })) as unknown as Collection[];
 
@@ -243,6 +250,28 @@ export const useDataStore = create<DataStore>()(
             await supabase.from('artwork_placements').delete().eq('article_id', articleId);
             if (placements.length > 0) await supabase.from('artwork_placements').insert(placements.map(p => ({ ...p, article_id: articleId })));
           }
+          if (updates.bom_items) {
+            await supabase.from('bom_items').delete().eq('article_id', articleId);
+            if (updates.bom_items.length > 0) await supabase.from('bom_items').insert(updates.bom_items.map(b => ({ ...b, article_id: articleId })));
+          }
+          if (updates.measurement_points) {
+            // This is more complex because of nested values
+            await supabase.from('measurement_points').delete().eq('article_id', articleId);
+            for (const mp of updates.measurement_points) {
+              const { values, ...pointData } = mp;
+              const { data: newPoint, error: pError } = await supabase
+                .from('measurement_points')
+                .insert([{ ...pointData, article_id: articleId }])
+                .select()
+                .single();
+              
+              if (!pError && newPoint && values?.length) {
+                await supabase.from('measurement_values').insert(
+                  values.map(v => ({ ...v, point_id: newPoint.id }))
+                );
+              }
+            }
+          }
         } finally {
           set({ isSaving: false });
         }
@@ -295,7 +324,7 @@ export const useDataStore = create<DataStore>()(
 
         const { data: original, error: fetchError } = await supabase
           .from('articles')
-          .select('*, sizes(*), artwork_placements(*), pantone_colors(*), article_images(*)')
+          .select('*, sizes(*), artwork_placements(*), pantone_colors(*), article_images(*), bom_items(*), measurement_points(*, measurement_values(*))')
           .eq('id', articleId)
           .single();
 
@@ -334,6 +363,20 @@ export const useDataStore = create<DataStore>()(
         if (original.pantone_colors?.length) await supabase.from('pantone_colors').insert(original.pantone_colors.map((item: Record<string, unknown>) => { const { id, created_at, ...rest } = item; return { ...rest, article_id: duplicate.id }; }));
         if (original.artwork_placements?.length) await supabase.from('artwork_placements').insert(original.artwork_placements.map((item: Record<string, unknown>) => { const { id, created_at, ...rest } = item; return { ...rest, article_id: duplicate.id }; }));
         if (original.article_images?.length) await supabase.from('article_images').insert(original.article_images.map((item: Record<string, unknown>) => { const { id, created_at, ...rest } = item; return { ...rest, article_id: duplicate.id }; }));
+        if (original.bom_items?.length) await supabase.from('bom_items').insert(original.bom_items.map((item: Record<string, unknown>) => { const { id, created_at, ...rest } = item; return { ...rest, article_id: duplicate.id }; }));
+        
+        if (original.measurement_points?.length) {
+          for (const mp of original.measurement_points) {
+            const { id: oldId, created_at: ca, measurement_values, ...pointData } = mp;
+            const { data: newPoint } = await supabase.from('measurement_points').insert([{ ...pointData, article_id: duplicate.id }]).select().single();
+            if (newPoint && measurement_values?.length) {
+               await supabase.from('measurement_values').insert(measurement_values.map((v: any) => {
+                 const { id, created_at, ...valData } = v;
+                 return { ...valData, point_id: newPoint.id };
+               }));
+            }
+          }
+        }
 
         await getData().fetchCollections();
         useUIStore.getState().setActiveArticle(duplicate.id);

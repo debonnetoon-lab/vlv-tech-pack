@@ -10,10 +10,12 @@ const STEPS = [
   { id: 2, title: "Afbeeldingen", sub: "Voeg visuals toe", shortcut: "⌘2" },
   { id: 3, title: "Print & Plaatsing", sub: "Waar komt het?", shortcut: "⌘3" },
   { id: 4, title: "Kleuren", sub: "Welke kleuren?", shortcut: "⌘4" },
-  { id: 5, title: "Extra Info", sub: "Labels & verpakking", shortcut: "⌘5" },
-  { id: 6, title: "Controle", sub: "Alles nakijken", shortcut: "⌘6" },
-  { id: 7, title: "Maten & Aantallen", sub: "Stanley & Stella", shortcut: "⌘7" },
-  { id: 8, title: "Klaar voor Export", sub: "Download PDF", shortcut: "⌘8" },
+  { id: 5, title: "Materiaallijst", sub: "Bill of Materials (BOM)", shortcut: "⌘5" },
+  { id: 6, title: "Maattabel", sub: "Technische specs", shortcut: "⌘6" },
+  { id: 7, title: "Labels & Verpakking", sub: "Afwerking details", shortcut: "⌘7" },
+  { id: 8, title: "Controle", sub: "Alles nakijken", shortcut: "⌘8" },
+  { id: 9, title: "Maten & Aantallen", sub: "Bestelling details", shortcut: "⌘9" },
+  { id: 10, title: "Klaar voor Export", sub: "Download PDF", shortcut: "⌘0" },
 ];
 
 export default function WizardStepper() {

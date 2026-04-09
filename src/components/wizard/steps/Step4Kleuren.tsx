@@ -12,7 +12,10 @@ const QUICK_COLORS = [
   { hex: "#000000", name: "Black", p: "Pantone Black C" },
   { hex: "#FFFFFF", name: "White", p: "Pantone White" },
   { hex: "#FF0000", name: "Red", p: "Pantone 200 C" },
-  { hex: "#0000FF", name: "Navy", p: "Pantone 289 C" },
+  { hex: "#000080", name: "Navy", p: "Pantone 289 C" },
+  { hex: "#808080", name: "Grey", p: "Pantone Cool Gray 8 C" },
+  { hex: "#FFFF00", name: "Yellow", p: "Pantone Yellow C" },
+  { hex: "#00FF00", name: "Green", p: "Pantone 354 C" },
 ];
 
 export default function Step4Kleuren({ article, collectionId }: { article: TechPackArticle, collectionId: string }) {
@@ -94,23 +97,31 @@ export default function Step4Kleuren({ article, collectionId }: { article: TechP
                  </div>
                </div>
 
-               <div className="flex-1 grid grid-cols-2 gap-4">
+               <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                  <div className="space-y-1">
-                   <Label className="text-[10px] font-bold text-slate-400 uppercase">Kleur Naam</Label>
+                   <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kleur Naam</Label>
                    <Input 
-                      placeholder="bv. Black" 
+                      placeholder="bv. VLV Red" 
                       value={c.color_name || ""}
                       onChange={(e) => updateColor(i, { color_name: e.target.value })}
-                      className="border-slate-100 focus:border-slate-900"
+                      className="h-10 border-slate-100 focus:border-[#22c981] font-bold"
                     />
                  </div>
                  <div className="space-y-1">
-                   <Label className="text-[10px] font-bold text-slate-400 uppercase">Pantone C (Belangrijk)</Label>
+                   <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pantone Code</Label>
                    <Input 
-                      placeholder="bv. Pantone Cool Gray 7 C" 
+                      placeholder="bv. Pantone 200 C" 
                       value={c.pantone_code || ""}
                       onChange={(e) => updateColor(i, { pantone_code: e.target.value })}
-                      className="border-slate-100 focus:border-slate-900"
+                      className="h-10 border-slate-100 focus:border-[#22c981]"
+                    />
+                 </div>
+                 <div className="space-y-1">
+                   <Label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">HEX / RGB</Label>
+                   <Input 
+                      value={c.hex_value} 
+                      onChange={(e) => updateColor(i, { hex_value: e.target.value })}
+                      className="h-10 border-slate-100 focus:border-[#22c981] font-mono text-center"
                     />
                  </div>
                </div>

@@ -226,6 +226,40 @@ const styles = StyleSheet.create({
     lineHeight: 1.5,
     fontStyle: "italic",
     textAlign: "justify",
+  },
+  // Phase 3: Tables
+  specTable: {
+    width: "100%",
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  specTableHeader: {
+    flexDirection: "row",
+    backgroundColor: "#F8FAFC",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  specTableRow: {
+    flexDirection: "row",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#F1F5F9",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  specHeaderCell: {
+    fontSize: 6,
+    fontWeight: "black",
+    color: "#64748B",
+    textTransform: "uppercase",
+  },
+  specCell: {
+    fontSize: 7,
+    color: "#0F172A",
   }
 });
 
@@ -288,26 +322,70 @@ export const TechPackPages = ({ article, collectionName }: Props) => {
     </View>
   );
 
-  const renderSizingTable = () => {
-    const validSizes = article.sizes?.filter(s => (s.order_quantity || 0) > 0) || [];
-    if (validSizes.length === 0) return null;
-
-    const totalQty = validSizes.reduce((acc, s) => acc + (s.order_quantity || 0), 0);
+  const renderBOM = () => {
+    const items = article.bom_items || [];
+    if (items.length === 0) return null;
 
     return (
-      <View style={[styles.section, { marginTop: 10 }]}>
-        <Text style={styles.sectionTitle}>Order Quantities ({article.gender || "Unisex"})</Text>
-        <View style={styles.sizingGrid}>
-          {validSizes.map((s, idx) => (
-            <View key={`${s.size_label}-${idx}`} style={styles.sizingCell}>
-              <Text style={styles.sizingLabel}>{s.size_label}</Text>
-              <Text style={styles.sizingValue}>{s.order_quantity}</Text>
-            </View>
-          ))}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Bill of Materials (BOM)</Text>
+        <View style={styles.specTable}>
+           <View style={styles.specTableHeader}>
+              <Text style={[styles.specHeaderCell, { width: "15%" }]}>Cat.</Text>
+              <Text style={[styles.specHeaderCell, { width: "35%" }]}>Omschrijving</Text>
+              <Text style={[styles.specHeaderCell, { width: "20%" }]}>Spec</Text>
+              <Text style={[styles.specHeaderCell, { width: "15%" }]}>Leverancier</Text>
+              <Text style={[styles.specHeaderCell, { width: "15%", textAlign: "right" }]}>Hvh / Eenheid</Text>
+           </View>
+           {items.map((item, i) => (
+             <View key={i} style={styles.specTableRow}>
+                <Text style={[styles.specCell, { width: "15%" }]}>{safeText(item.category)}</Text>
+                <Text style={[styles.specCell, { width: "35%", fontWeight: "bold" }]}>{safeText(item.description)}</Text>
+                <Text style={[styles.specCell, { width: "20%" }]}>{safeText(item.specification)}</Text>
+                <Text style={[styles.specCell, { width: "15%" }]}>{safeText(item.supplier)}</Text>
+                <Text style={[styles.specCell, { width: "15%", textAlign: "right" }]}>{item.quantity} {item.unit}</Text>
+             </View>
+           ))}
         </View>
-        <View style={styles.sizingTotal}>
-          <Text style={{ fontSize: 8, fontWeight: "bold", textTransform: "uppercase" }}>Totaal aantal te bestellen</Text>
-          <Text style={{ fontSize: 12, fontWeight: "bold" }}>{totalQty} stuks</Text>
+      </View>
+    );
+  };
+
+  const renderMeasurementSpecs = () => {
+    const points = article.measurement_points || [];
+    if (points.length === 0) return null;
+
+    // Determine sizes to show based on the first point or article gender
+    const SIZE_GAMMAS = {
+      "unisex": ["3XS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"],
+      "women": ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL"],
+      "kids": ["3-4j", "5-6j", "7-8j", "9-11j", "12-14j"],
+      "baby": ["0/6m", "6/12m", "12/18m", "18/24m", "2/3j"]
+    };
+    const activeSizes = SIZE_GAMMAS[article.gender as keyof typeof SIZE_GAMMAS] || SIZE_GAMMAS["unisex"];
+    const colWidth = 70 / activeSizes.length + "%";
+
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Size Specifications (CM)</Text>
+        <View style={styles.specTable}>
+           <View style={styles.specTableHeader}>
+              <Text style={[styles.specHeaderCell, { width: "20%" }]}>P.O.M.</Text>
+              <Text style={[styles.specHeaderCell, { width: "10%" }]}>Tol.</Text>
+              {activeSizes.map(s => (
+                <Text key={s} style={[styles.specHeaderCell, { width: colWidth, textAlign: "center", color: "#22c981" }]}>{s}</Text>
+              ))}
+           </View>
+           {points.map((p, i) => (
+             <View key={i} style={styles.specTableRow}>
+                <Text style={[styles.specCell, { width: "20%", fontWeight: "bold" }]}>{safeText(p.label)}</Text>
+                <Text style={[styles.specCell, { width: "10%", fontSize: 6 }]}>{safeText(p.tolerance)}</Text>
+                {activeSizes.map(s => {
+                   const val = p.values?.find(v => v.size_label === s);
+                   return <Text key={s} style={[styles.specCell, { width: colWidth, textAlign: "center" }]}>{val?.value_cm || "-"}</Text>;
+                })}
+             </View>
+           ))}
         </View>
       </View>
     );
@@ -612,13 +690,37 @@ export const TechPackPages = ({ article, collectionName }: Props) => {
             <Text>© {new Date().getFullYear()} VIVE LE VELO - CONFIDENTIAL</Text>
             <Text>Concept & Uitwerking door TOON DEBONNE - Alle rechten voorbehouden.</Text>
           </View>
-          <Text style={{ textAlign: "right" }}>Pagina 2 van {(article.placements?.length || 0) + 2}</Text>
+          <Text style={{ textAlign: "right" }}>Pagina 2 van {(article.placements?.length || 0) + 3}</Text>
+        </View>
+      </Page>
+
+      {/* NEW Page 3: BOM & Technical Specs */}
+      <Page size="A4" style={styles.page}>
+        <View style={[styles.header, { marginBottom: 20 }]}>
+          <View>
+            <Text style={styles.companyName}>{COMPANY_INFO.name}</Text>
+            <Text style={styles.label}>Technische Fiche - PAGINA 3/3</Text>
+          </View>
+          <View style={{ textAlign: "right" }}>
+            <Text style={{ fontSize: 10, fontWeight: "bold" }}>{safeText(article.reference_code, "CODE-TBA")}</Text>
+            <Text style={{ fontSize: 8, color: "#64748B" }}>{safeText(article.product_name)}</Text>
+          </View>
+        </View>
+
+        {renderBOM()}
+        {renderMeasurementSpecs()}
+
+        <View style={styles.footer}>
+          <View style={{ flexDirection: "column", gap: 2 }}>
+            <Text>© {new Date().getFullYear()} VIVE LE VELO - CONFIDENTIAL</Text>
+          </View>
+          <Text style={{ textAlign: "right" }}>Pagina 3 van {(article.placements?.length || 0) + 3}</Text>
         </View>
       </Page>
 
       {/* NEW: Per-Placement Production Pages */}
       {article.placements?.map((p, index) => 
-        renderPlacementSpecPage(p, index, article.placements?.length || 0)
+        renderPlacementSpecPage(p, index + 1, article.placements?.length || 0)
       )}
     </>
   );

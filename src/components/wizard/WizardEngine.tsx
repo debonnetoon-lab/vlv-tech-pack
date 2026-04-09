@@ -9,7 +9,8 @@ import Step4Kleuren from "./steps/Step4Kleuren";
 import Step5ExtraInfo from "./steps/Step5ExtraInfo";
 import Step6Controle from "./steps/Step6Controle";
 import Step7Export from "./steps/Step7Export";
-import Step8Order from "./steps/Step8Order";
+import Step5BOM from "./steps/Step5BOM";
+import Step6SizeSpecs from "./steps/Step6SizeSpecs";
 import Dashboard from "../dashboard/Dashboard";
 import { ArticlePresence } from "../collaboration/ArticlePresence";
 import { Plus, Clock, FileText, ChevronRight, Edit2, Folder } from "lucide-react";
@@ -99,10 +100,12 @@ export default function WizardEngine() {
     2: <Step2Afbeeldingen article={activeArticle} collectionId={activeCollectionId!} />,
     3: <Step3PrintPlaatsing article={activeArticle} collectionId={activeCollectionId!} />,
     4: <Step4Kleuren article={activeArticle} collectionId={activeCollectionId!} />,
-    5: <Step5ExtraInfo article={activeArticle} collectionId={activeCollectionId!} />,
-    6: <Step6Controle article={activeArticle} collectionId={activeCollectionId!} />,
-    7: <Step8Order article={activeArticle} collectionId={activeCollectionId!} />,
-    8: <Step7Export article={activeArticle} collectionId={activeCollectionId!} />,
+    5: <Step5BOM article={activeArticle} collectionId={activeCollectionId!} />,
+    6: <Step6SizeSpecs article={activeArticle} collectionId={activeCollectionId!} />,
+    7: <Step5ExtraInfo article={activeArticle} collectionId={activeCollectionId!} />,
+    8: <Step6Controle article={activeArticle} collectionId={activeCollectionId!} />,
+    9: <Step8Order article={activeArticle} collectionId={activeCollectionId!} />,
+    10: <Step7Export article={activeArticle} collectionId={activeCollectionId!} />,
   };
 
   const { updateArticle } = useTechPackStore();

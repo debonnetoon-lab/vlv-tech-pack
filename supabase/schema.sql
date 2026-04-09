@@ -14,6 +14,9 @@ DROP TABLE IF EXISTS public.field_locks CASCADE;
 DROP TABLE IF EXISTS public.article_images CASCADE;
 DROP TABLE IF EXISTS public.pantone_colors CASCADE;
 DROP TABLE IF EXISTS public.artwork_placements CASCADE;
+DROP TABLE IF EXISTS public.bom_items CASCADE;
+DROP TABLE IF EXISTS public.measurement_values CASCADE;
+DROP TABLE IF EXISTS public.measurement_points CASCADE;
 DROP TABLE IF EXISTS public.sizes CASCADE;
 DROP TABLE IF EXISTS public.articles CASCADE;
 DROP TABLE IF EXISTS public.collections CASCADE;
@@ -445,7 +448,95 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('tech-pack-assets', 'tech-pack-assets', true)
 ON CONFLICT DO NOTHING;
 
--- Storage policies
+-- ─────────────────────────────────────────────
+--  FASHION TECH PACK EXTENSIONS (Phase 3)
+-- ─────────────────────────────────────────────
+
+-- 1. Bill of Materials (BOM)
+CREATE TABLE public.bom_items (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  article_id      UUID NOT NULL REFERENCES public.articles(id) ON DELETE CASCADE,
+  category        TEXT NOT NULL, -- Fabric, Trim, Thread, Label, Packaging, Other
+  description     TEXT NOT NULL,
+  specification   TEXT,          -- e.g. "100% Organic Cotton" or "YKK Zipper"
+  supplier        TEXT,
+  color_code      TEXT,
+  quantity        NUMERIC(10,3) DEFAULT 0,
+  unit            TEXT DEFAULT 'pcs', -- m, pcs, kg, etc.
+  sort_order      SMALLINT DEFAULT 0,
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- 2. Maattabel Meetpunten (Size Specs Points)
+CREATE TABLE public.measurement_points (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  article_id      UUID NOT NULL REFERENCES public.articles(id) ON DELETE CASCADE,
+  label           TEXT NOT NULL, -- e.g. "A: 1/2 Chest width"
+  description     TEXT,          -- e.g. "At 2cm below armhole"
+  tolerance       TEXT,          -- e.g. "+/- 1cm"
+  sort_order      SMALLINT DEFAULT 0,
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- 3. Maattabel Waarden (Size Specs Values)
+CREATE TABLE public.measurement_values (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  point_id        UUID NOT NULL REFERENCES public.measurement_points(id) ON DELETE CASCADE,
+  size_label      TEXT NOT NULL, -- e.g. "XS", "S", "M"
+  value_cm        NUMERIC(5,1),
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- ─────────────────────────────────────────────
+--  RLS VOOR NIEUWE TABELLEN
+-- ─────────────────────────────────────────────
+
+ALTER TABLE public.bom_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.measurement_points ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.measurement_values ENABLE ROW LEVEL SECURITY;
+
+-- BOM Policies
+CREATE POLICY "Users can manage BOM items of their organizations"
+  ON public.bom_items
+  FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.articles a
+      JOIN public.collections c ON a.collection_id = c.id
+      JOIN public.organization_members om ON c.organization_id = om.organization_id
+      WHERE a.id = public.bom_items.article_id AND om.user_id = auth.uid()
+    )
+  );
+
+-- Measurement Points Policies
+CREATE POLICY "Users can manage measurement points of their organizations"
+  ON public.measurement_points
+  FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.articles a
+      JOIN public.collections c ON a.collection_id = c.id
+      JOIN public.organization_members om ON c.organization_id = om.organization_id
+      WHERE a.id = public.measurement_points.article_id AND om.user_id = auth.uid()
+    )
+  );
+
+-- Measurement Values Policies
+CREATE POLICY "Users can manage measurement values of their organizations"
+  ON public.measurement_values
+  FOR ALL
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.measurement_points mp
+      JOIN public.articles a ON mp.article_id = a.id
+      JOIN public.collections c ON a.collection_id = c.id
+      JOIN public.organization_members om ON c.organization_id = om.organization_id
+      WHERE mp.id = public.measurement_values.point_id AND om.user_id = auth.uid()
+    )
+  );
+
+
+-- Storage policies (Existing, but re-run for safety if needed)
 DROP POLICY IF EXISTS "assets_select_all" ON storage.objects;
 CREATE POLICY "assets_select_all"
   ON storage.objects FOR SELECT

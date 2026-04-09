@@ -14,6 +14,36 @@ export interface AIResult {
   overlay_preview_url?: string;
 }
 
+export interface BOMItem {
+  id?: string;
+  article_id: string;
+  category: string;
+  description: string;
+  specification?: string;
+  supplier?: string;
+  color_code?: string;
+  quantity: number;
+  unit: string;
+  sort_order?: number;
+}
+
+export interface MeasurementPoint {
+  id?: string;
+  article_id: string;
+  label: string;
+  description?: string;
+  tolerance?: string;
+  sort_order?: number;
+  values?: MeasurementValue[];
+}
+
+export interface MeasurementValue {
+  id?: string;
+  point_id: string;
+  size_label: string;
+  value_cm: number | null;
+}
+
 export type GarmentType = 'jersey' | 'bib_shorts' | 'jacket' | 'vest' | 'gloves' | 'socks' | 'cap' | 'skinsuit' | 'other';
 export type GenderType = 'men' | 'women' | 'unisex' | 'kids';
 export type FitType = 'race' | 'sport' | 'relaxed' | 'custom';
@@ -113,6 +143,8 @@ export interface TechPackArticle {
   placements: ArtworkPlacement[];
   colors: PantoneColor[];
   images: ArticleImage[];
+  bom_items: BOMItem[];
+  measurement_points: MeasurementPoint[];
   
   // AI Results (stored in articles table as JSONB or separate)
   ai_measurement?: AIResult;
