@@ -40,7 +40,7 @@ export default function Sidebar() {
     user
   } = useTechPackStore();
 
-  const { isSettingsOpen, setSettingsOpen } = useUIStore();
+  const { setSettingsOpen } = useUIStore();
   const [showNewCollectionModal, setShowNewCollectionModal] = React.useState(false);
   const [newCollectionName, setNewCollectionName] = React.useState("");
 
@@ -99,7 +99,7 @@ export default function Sidebar() {
             {collections.slice(0, 5).map((col: any) => (
                <div key={col.id} className="space-y-1">
                  <button 
-                    onClick={() => { setActiveCollection(col.id); setActiveArticle(col.articles?.[0]?.id || null); setActiveStep(1); setSettingsOpen(false); }}
+                    onClick={() => { setActiveCollection(col.id); setActiveArticle(col.articles?.[0]?.id || null); setActiveStep(1); }}
                     className={cn(
                       "w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold transition-all",
                       activeCollectionId === col.id ? "bg-[#22c981]/10 text-white border border-[#22c981]/20 shadow-md" : "hover:bg-white/5 text-slate-500"
@@ -115,7 +115,7 @@ export default function Sidebar() {
                        {col.articles?.map((art: any) => (
                           <button
                             key={art.id}
-                            onClick={() => { setActiveArticle(art.id); setActiveStep(1); setSettingsOpen(false); }}
+                            onClick={() => { setActiveArticle(art.id); setActiveStep(1); }}
                             className={cn(
                                "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-bold transition-all group",
                                activeArticleId === art.id ? "text-[#22c981] bg-[#22c981]/5 shadow-sm" : "text-slate-400 hover:text-white hover:bg-white/5"
@@ -126,7 +126,7 @@ export default function Sidebar() {
                           </button>
                        ))}
                        <button
-                         onClick={() => { addArticle(col.id, { product_name: "Nieuw Artikel" }); setActiveStep(1); setSettingsOpen(false); }}
+                         onClick={() => { addArticle(col.id, { product_name: "Nieuw Artikel" }); setActiveStep(1); }}
                          className="w-full flex items-center gap-2 px-3 py-2 mt-2 rounded-lg text-[10px] font-bold transition-all text-white/40 hover:text-[#22c981] hover:bg-[#22c981]/5 border border-dashed border-white/10 hover:border-[#22c981]/30"
                        >
                          <Plus className="w-3 h-3" />
@@ -158,13 +158,10 @@ export default function Sidebar() {
       {/* ── FOOTER / SETTINGS (Punt 13) ── */}
       <div className="p-3 border-t border-white/[0.03] space-y-3 bg-[#0b1912]">
         <button 
-           onClick={() => setSettingsOpen(!isSettingsOpen)}
-           className={cn(
-             "w-full flex items-center gap-3 p-3 rounded-2xl transition-all text-[10px] font-black uppercase tracking-widest",
-             isSettingsOpen ? "bg-white/10 text-white shadow-inner" : "text-slate-500 hover:bg-white/[0.03] hover:text-white"
-           )}
+           onClick={() => setSettingsOpen(true)}
+           className="w-full flex items-center gap-3 p-3 rounded-2xl text-slate-500 hover:bg-white/[0.03] hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
         >
-           <div className={cn("w-7 h-7 rounded-lg flex items-center justify-center transition-colors", isSettingsOpen ? "bg-[#22c981] text-[#0b1912]" : "bg-white/5")}>
+           <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center">
               <Settings className="w-3.5 h-3.5" />
            </div>
            Instellingen & Back-up
