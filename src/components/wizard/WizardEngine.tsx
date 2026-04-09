@@ -11,7 +11,7 @@ import Step6Controle from "./steps/Step6Controle";
 import Step7Export from "./steps/Step7Export";
 import Step8Order from "./steps/Step8Order";
 import { ArticlePresence } from "../collaboration/ArticlePresence";
-import { Plus, Clock, FileText, ChevronRight, Edit2 } from "lucide-react";
+import { Plus, Clock, FileText, ChevronRight, Edit2, Folder } from "lucide-react";
 
 function InlineEdit({ 
   value, 
@@ -57,6 +57,8 @@ export default function WizardEngine() {
     setActiveStep
   } = useTechPackStore();
 
+  const { setCollectionModalOpen } = useUIStore();
+
   // Keyboard shortcuts (punt 8)
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -97,6 +99,33 @@ export default function WizardEngine() {
 
   // Mock recent items or fetch from store
   const recentArticles = activeCollection?.articles.slice(0, 3) || [];
+
+  if (collections.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] animate-in fade-in zoom-in-95 duration-500">
+        <div className="w-20 h-20 bg-[#22c981]/10 rounded-[28px] flex items-center justify-center mb-8 border border-[#22c981]/20">
+          <Folder className="w-10 h-10 text-[#22c981]" />
+        </div>
+        
+        <div className="text-center space-y-3 mb-10 max-w-sm">
+          <h2 className="text-2xl font-black italic tracking-tighter text-[#0b1912] uppercase">Welkom bij VLV Tech Pack</h2>
+          <p className="text-sm font-medium text-slate-500 leading-relaxed">
+            Je hebt nog geen collecties. Maak direct je eerste collectie aan om artikelen toe te kunnen voegen.
+          </p>
+        </div>
+
+        <button 
+          onClick={() => setCollectionModalOpen(true)}
+          className="group relative px-8 py-4 bg-[#0b1912] text-[#22c981] rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-[1.03] transition-all active:scale-95 shadow-xl shadow-[#0b1912]/20"
+        >
+          <span className="flex items-center gap-3">
+             <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform" />
+             Eerste Collectie Aanmaken
+          </span>
+        </button>
+      </div>
+    );
+  }
 
   if (!activeArticle) {
     return (

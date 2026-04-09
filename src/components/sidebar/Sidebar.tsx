@@ -40,15 +40,14 @@ export default function Sidebar() {
     user
   } = useTechPackStore();
 
-  const { setSettingsOpen } = useUIStore();
-  const [showNewCollectionModal, setShowNewCollectionModal] = React.useState(false);
+  const { setSettingsOpen, isCollectionModalOpen, setCollectionModalOpen } = useUIStore();
   const [newCollectionName, setNewCollectionName] = React.useState("");
 
   const activeCollection = collections.find((c: any) => c.id === activeCollectionId);
   const activeArticle = activeCollection?.articles.find((a: any) => a.id === activeArticleId);
 
   const handleCreateCollection = () => {
-    setShowNewCollectionModal(true);
+    setCollectionModalOpen(true);
   };
 
   const submitNewCollection = (e: React.FormEvent) => {
@@ -56,7 +55,7 @@ export default function Sidebar() {
     if (newCollectionName.trim()) {
       addCollection(newCollectionName.trim());
       setNewCollectionName("");
-      setShowNewCollectionModal(false);
+      setCollectionModalOpen(false);
     }
   };
 
@@ -184,8 +183,8 @@ export default function Sidebar() {
 
       {/* Modals styles unchanged */}
 
-      {showNewCollectionModal && (
-        <div className="fixed inset-0 z-50 bg-[#0b1912]/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowNewCollectionModal(false)}>
+      {isCollectionModalOpen && (
+        <div className="fixed inset-0 z-50 bg-[#0b1912]/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setCollectionModalOpen(false)}>
           <div className="w-full max-w-sm bg-white rounded-[40px] shadow-2xl p-10 space-y-6 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
              <div className="space-y-1">
                 <h3 className="text-2xl font-black italic tracking-tighter uppercase text-[#0b1912]">Nieuwe Collectie</h3>
@@ -201,7 +200,7 @@ export default function Sidebar() {
                    onChange={(e) => setNewCollectionName(e.target.value)}
                 />
                 <div className="flex gap-2 pt-2">
-                   <button type="button" onClick={() => setShowNewCollectionModal(false)} className="flex-1 h-14 rounded-2xl text-slate-400 font-bold hover:bg-slate-50 transition-colors uppercase text-[10px] tracking-widest">Annuleren</button>
+                   <button type="button" onClick={() => setCollectionModalOpen(false)} className="flex-1 h-14 rounded-2xl text-slate-400 font-bold hover:bg-slate-50 transition-colors uppercase text-[10px] tracking-widest">Annuleren</button>
                    <button type="submit" disabled={!newCollectionName.trim()} className="flex-[2] h-14 rounded-2xl bg-[#0b1912] text-[#22c981] font-black hover:scale-[1.03] disabled:opacity-50 disabled:hover:scale-100 transition-all uppercase text-[10px] tracking-widest shadow-xl active:scale-[0.98]">Aanmaken</button>
                 </div>
              </form>
