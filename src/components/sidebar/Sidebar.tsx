@@ -89,6 +89,20 @@ export default function Sidebar() {
         <PresenceBanner />
       </div>
 
+      {/* ── OVERZICHT (Dashboard) ── */}
+      <div className="p-3 border-b border-white/[0.03]">
+        <button
+          onClick={() => { setActiveArticle(null); setActiveCollection(null); setSettingsOpen(false); }}
+          className={cn(
+            "w-full flex items-center gap-3 p-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all",
+            !activeArticleId && !isSettingsOpen ? "bg-[#22c981] text-[#0b1912] shadow-md shadow-[#22c981]/20" : "text-white/40 hover:bg-white/5 hover:text-white"
+          )}
+        >
+          <GripVertical className="w-4 h-4" />
+          Dashboard
+        </button>
+      </div>
+
       {/* ── COLLECTIONS SELECTOR ── */}
       <div className="p-3 border-b border-white/[0.03]">
          <div className="flex items-center justify-between mb-2 px-1">
