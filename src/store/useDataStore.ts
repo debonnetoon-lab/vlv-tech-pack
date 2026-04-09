@@ -49,7 +49,7 @@ export const assetStorage = {
 
 interface DataStore {
   collections: Collection[];
-  
+  organizationId: string | null;
   isSaving: boolean;
   
   fetchCollections: () => Promise<void>;
@@ -68,6 +68,7 @@ export const useDataStore = create<DataStore>()(
   persist(
     (set, getData) => ({
       collections: [],
+      organizationId: null,
       isSaving: false,
 
       fetchCollections: async () => {
@@ -88,6 +89,21 @@ export const useDataStore = create<DataStore>()(
             ...profileData, 
             email: user.email 
           } as unknown as PresenceUser);
+        }
+
+        // Fetch User's Organization
+        const { data: orgMember } = await supabase
+          .from('organization_members')
+          .select('organization_id')
+          .eq('user_id', user.id)
+          .limit(1)
+          .single();
+        
+        if (orgMember) {
+          set({ organizationId: orgMember.organization_id });
+        } else {
+          // If no organization exists (e.g. existing user before migration), 
+          // we might need to create one, but let's try to fetch collections first.
         }
 
         const { data, error } = await supabase
@@ -138,15 +154,47 @@ export const useDataStore = create<DataStore>()(
       },
 
       addCollection: async (name: string, details?: Partial<Collection>) => {
-        const user = useCollaborationStore.getState().user;
-        if (!user) return;
+        const { organizationId, fetchCollections } = getData();
+        let orgId = organizationId;
+
+        // Fallback: If no organizationId is set, user might be a legacy user
+        // We try to fetch or create one here for safety.
+        if (!orgId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          
+          const { data: orgMember } = await supabase
+            .from('organization_members')
+            .select('organization_id')
+            .eq('user_id', user.id)
+            .limit(1)
+            .single();
+          
+          if (orgMember) {
+            orgId = orgMember.organization_id;
+            set({ organizationId: orgId });
+          } else {
+             // Create a fallback organization for legacy users
+             const { data: newOrg } = await supabase.from('organizations').insert([{ name: 'Personal Workspace' }]).select().single();
+             if (newOrg) {
+               await supabase.from('organization_members').insert([{ organization_id: newOrg.id, user_id: user.id, role: 'owner' }]);
+               orgId = newOrg.id;
+               set({ organizationId: orgId });
+             }
+          }
+        }
+
+        if (!orgId) {
+          console.error("No organization available.");
+          return;
+        }
 
         set({ isSaving: true });
         const { data, error } = await supabase
           .from('collections')
           .insert([{ 
             name, 
-            created_by: user.id,
+            organization_id: orgId,
             season: details?.season || "",
             year: details?.year || new Date().getFullYear(),
             description: details?.description || ""
