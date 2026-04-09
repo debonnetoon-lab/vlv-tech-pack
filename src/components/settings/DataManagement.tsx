@@ -168,10 +168,10 @@ export default function DataManagement() {
           </div>
           <Button 
             onClick={handleExport}
-            className="w-full bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 shadow-sm h-10 text-xs font-bold gap-2"
+            className="w-full bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 shadow-sm h-auto min-h-[40px] py-2 text-xs font-bold gap-2"
           >
-            <Download className="w-3.5 h-3.5" />
-            Systeemkopie Downloaden (incl. afbeeldingen)
+            <Download className="w-3.5 h-3.5 shrink-0" />
+            <span className="whitespace-normal leading-tight">Systeemkopie Downloaden (incl. afbeeldingen)</span>
           </Button>
         </div>
 
@@ -196,7 +196,7 @@ export default function DataManagement() {
           <Button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isImporting}
-            className={`w-full shadow-sm h-10 text-xs font-bold gap-2 transition-all ${
+            className={`w-full shadow-sm h-auto min-h-[40px] py-2 text-xs font-bold gap-2 transition-all ${
               importStatus === 'success'
                 ? 'bg-green-500 text-white border-green-500'
                 : importStatus === 'error'
@@ -204,16 +204,18 @@ export default function DataManagement() {
                 : 'bg-white text-slate-900 border border-slate-200 hover:bg-slate-50'
             }`}
           >
-            {isImporting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            {importStatus === 'success' && <CheckCircle2 className="w-3.5 h-3.5" />}
-            {importStatus === 'error' && <AlertTriangle className="w-3.5 h-3.5" />}
-            {isImporting
-              ? 'Importeren...'
-              : importStatus === 'success'
-              ? 'Succesvol geïmporteerd!'
-              : importStatus === 'error'
-              ? 'Fout bij importeren'
-              : 'Bestand Selecteren'}
+            {isImporting && <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />}
+            {importStatus === 'success' && <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />}
+            {importStatus === 'error' && <AlertTriangle className="w-3.5 h-3.5 shrink-0" />}
+            <span className="whitespace-normal leading-tight">
+              {isImporting
+                ? 'Importeren...'
+                : importStatus === 'success'
+                ? 'Succesvol geïmporteerd!'
+                : importStatus === 'error'
+                ? 'Fout bij importeren'
+                : 'Bestand Selecteren'}
+            </span>
           </Button>
         </div>
 
@@ -234,19 +236,16 @@ export default function DataManagement() {
             <Button 
               onClick={handleBulkPDFExport}
               disabled={isGenerating || activeCollection.articles.length === 0}
-              className="w-full bg-indigo-600 text-white hover:bg-indigo-700 shadow-md h-10 text-xs font-bold gap-2 transition-all"
+              className="w-full bg-indigo-600 text-white hover:bg-indigo-700 shadow-md h-auto min-h-[40px] py-2 text-xs font-bold gap-2 transition-all"
             >
               {isGenerating ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  PDF WORDT GEGENEREERD...
-                </>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
               ) : (
-                <>
-                  <Download className="w-3.5 h-3.5" />
-                  Download Volledige Collectie (PDF)
-                </>
+                  <Download className="w-3.5 h-3.5 shrink-0" />
               )}
+              <span className="whitespace-normal leading-tight">
+                {isGenerating ? "PDF WORDT GEGENEREERD..." : "Volledige Collectie (PDF)"}
+              </span>
             </Button>
           </div>
         )}
