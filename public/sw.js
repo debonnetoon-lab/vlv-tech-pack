@@ -1,18 +1,16 @@
-const CACHE_NAME = 'vlv-static-v1';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
+const CACHE_NAME = 'vlv-cache-v2';
+const STATIC_ASSETS = [
   '/offline.html',
-  '/styles.css',
-  '/main.js',
+  '/manifest.json',
+  '/VLV.svg',
   '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/icons/icon-512.png',
+  '/icons/maskable-icon.png'
 ];
-const API_URL_PREFIX = 'https://api.techpack.vivelevelo.be/';
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS_TO_CACHE))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
   );
   self.skipWaiting();
 });
@@ -27,41 +25,46 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  const req = event.request;
-  const url = new URL(req.url);
+  const { request } = event;
+  const url = new URL(request.url);
 
-  if (req.url.startsWith(API_URL_PREFIX)) {
+  // 1. Skip non-GET requests and browser extensions
+  if (request.method !== 'GET' || !url.protocol.startsWith('http')) return;
+
+  // 2. Cache-First for static assets and fonts
+  if (
+    request.destination === 'font' || 
+    url.pathname.startsWith('/_next/static/') ||
+    STATIC_ASSETS.includes(url.pathname)
+  ) {
     event.respondWith(
-      fetch(req)
-        .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
-          return res;
-        })
-        .catch(() => caches.match(req))
+      caches.match(request).then(cached => {
+        return cached || fetch(request).then(response => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+          return response;
+        });
+      })
     );
     return;
   }
 
-  if (req.mode === 'navigate' || req.destination === 'document') {
-    event.respondWith(
-      fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
-        return res;
-      }).catch(() => caches.match('/offline.html'))
-    );
-    return;
-  }
-
+  // 3. Stale-While-Revalidate for everything else (pages, API)
   event.respondWith(
-    caches.match(req).then(cached => {
-      if (cached) return cached;
-      return fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(req, copy));
-        return res;
+    caches.match(request).then(cached => {
+      const networkFetch = fetch(request).then(response => {
+        if (response.status === 200) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
+        }
+        return response;
+      }).catch(err => {
+        if (cached) return cached;
+        if (request.mode === 'navigate') return caches.match('/offline.html');
+        throw err;
       });
+
+      return cached || networkFetch;
     })
   );
 });
