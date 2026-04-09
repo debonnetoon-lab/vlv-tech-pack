@@ -11,23 +11,41 @@ import LoginForm from "@/components/auth/LoginForm";
 import { cn } from "@/lib/utils";
 
 function PresenceBanner() {
-  const { activeUsers, profile } = useTechPackStore();
-  
+  const { activeUsers = [], profile } = useTechPackStore();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Combine activeUsers with current profile to ensure "self" is always visible
-  // Deduplicate by ID
   const displayUsers = useMemo(() => {
+    if (!Array.isArray(activeUsers)) return [];
+    
     const list = [...activeUsers];
-    if (profile && !list.find(u => u.id === profile.id)) {
+    if (profile?.id && !list.some(u => u?.id === profile.id)) {
       list.push({
         ...profile,
         status: 'active'
       } as any);
     }
-    // Deduplicate by ID
-    return list.filter((u, idx, arr) => arr.findIndex(x => x.id === u.id) === idx);
+    // Deduplicate and filter out nulls/undefineds
+    return list.filter((u, idx, arr) => 
+      u && u.id && arr.findIndex(x => x?.id === u.id) === idx
+    );
   }, [activeUsers, profile]);
 
   const onlineCount = displayUsers.length;
+
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-between px-6 py-2 bg-[#0b1912] border-b border-white/[0.05] h-[40px] shadow-lg z-50 animate-pulse">
+        <div className="flex items-center gap-3">
+           <div className="w-10 h-3 bg-white/5 rounded" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-between px-6 py-2 bg-[#0b1912] border-b border-white/[0.05] text-white shadow-lg z-50">
@@ -38,7 +56,7 @@ function PresenceBanner() {
             .map((u: any) => (
             <div key={u.id} className={cn(
               "w-5 h-5 rounded-full border-2 border-[#0b1912] flex items-center justify-center text-[8px] font-black shadow-sm",
-              u.id === profile?.id ? "ring-2 ring-[#22c981] ring-offset-1 ring-offset-[#0b1912]" : ""
+              profile?.id && u.id === profile.id ? "ring-2 ring-[#22c981] ring-offset-1 ring-offset-[#0b1912]" : ""
             )} style={{ backgroundColor: u.avatar_color || "#1D9E75" }}>
               {(u.full_name || u.initials || "U").charAt(0).toUpperCase()}
             </div>
@@ -81,15 +99,24 @@ export default function Home() {
 
   React.useEffect(() => {
     // Initial check
+    // Initial check with timeout to prevent hanging on Vercel
     const initAuth = async () => {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout")), 5000)
+      );
+
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await Promise.race([
+          supabase.auth.getSession(),
+          timeoutPromise
+        ]) as any;
+
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchCollections();
         }
       } catch (err) {
-        console.error("Auth init error:", err);
+        console.error("Auth init error or timeout:", err);
       } finally {
         setInitializing(false);
       }
