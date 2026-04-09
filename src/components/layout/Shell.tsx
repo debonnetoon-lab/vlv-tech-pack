@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SaveStatus } from "./SaveStatus";
 import {  useUIStore, useDataStore , useTechPackStore } from "@/store";
 import { Menu, X, Plus } from "lucide-react";
@@ -31,8 +31,18 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
   } = useTechPackStore();
 
   const { isSettingsOpen, setSettingsOpen } = useUIStore();
-
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-4 border-slate-200 border-t-[#0b1912] animate-spin" />
+    </div>;
+  }
 
   const activeCollection = collections.find((c: any) => c.id === activeCollectionId);
   const activeArticle = activeCollection?.articles.find((a: any) => a.id === activeArticleId);
