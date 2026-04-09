@@ -40,7 +40,7 @@ export default function Sidebar() {
     user
   } = useTechPackStore();
 
-  const [showSettings, setShowSettings] = React.useState(false);
+  const { setSettingsOpen } = useUIStore();
   const [showNewCollectionModal, setShowNewCollectionModal] = React.useState(false);
   const [newCollectionName, setNewCollectionName] = React.useState("");
 
@@ -158,7 +158,7 @@ export default function Sidebar() {
       {/* ── FOOTER / SETTINGS (Punt 13) ── */}
       <div className="p-3 border-t border-white/[0.03] space-y-3 bg-[#0b1912]">
         <button 
-           onClick={() => setShowSettings(true)}
+           onClick={() => setSettingsOpen(true)}
            className="w-full flex items-center gap-3 p-3 rounded-2xl text-slate-500 hover:bg-white/[0.03] hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
         >
            <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center">
@@ -183,18 +183,6 @@ export default function Sidebar() {
       </div>
 
       {/* Modals styles unchanged */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 bg-[#0b1912]/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300" onClick={() => setShowSettings(false)}>
-          <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-[40px] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="relative h-full overflow-y-auto p-10 custom-scrollbar">
-              <button onClick={() => setShowSettings(false)} className="absolute top-8 right-8 p-2 hover:bg-slate-100 rounded-full z-10">
-                <Plus className="w-6 h-6 rotate-45 text-slate-400" />
-              </button>
-              <DataManagement />
-            </div>
-          </div>
-        </div>
-      )}
 
       {showNewCollectionModal && (
         <div className="fixed inset-0 z-50 bg-[#0b1912]/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setShowNewCollectionModal(false)}>

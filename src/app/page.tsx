@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
 import Shell from "@/components/layout/Shell";
 import Sidebar from "@/components/sidebar/Sidebar";
 import WizardEngine from "@/components/wizard/WizardEngine";
@@ -11,36 +11,46 @@ import LoginForm from "@/components/auth/LoginForm";
 import { cn } from "@/lib/utils";
 
 function PresenceBanner() {
-  const { activeUsers } = useTechPackStore();
+  const { activeUsers, profile } = useTechPackStore();
   
+  // Combine activeUsers with current profile to ensure "self" is always visible
+  // Deduplicate by ID
+  const displayUsers = useMemo(() => {
+    const list = [...activeUsers];
+    if (profile && !list.find(u => u.id === profile.id)) {
+      list.push({
+        ...profile,
+        status: 'active'
+      } as any);
+    }
+    // Deduplicate by ID
+    return list.filter((u, idx, arr) => arr.findIndex(x => x.id === u.id) === idx);
+  }, [activeUsers, profile]);
+
+  const onlineCount = displayUsers.length;
+
   return (
-    <div className="flex items-center justify-between px-6 py-2 bg-slate-900 text-white shadow-lg z-50">
+    <div className="flex items-center justify-between px-6 py-2 bg-[#0b1912] border-b border-white/[0.05] text-white shadow-lg z-50">
       <div className="flex items-center gap-3">
         <div className="flex -space-x-1.5">
-          {activeUsers
-            .filter((u: any, idx: number, arr: any[]) => arr.findIndex((x: any) => x.id === u.id) === idx)
+          {displayUsers
             .slice(0, 3)
-            .map((u: any, i: number) => (
+            .map((u: any) => (
             <div key={u.id} className={cn(
-              "w-5 h-5 rounded-full border-2 border-slate-900 flex items-center justify-center text-[8px] font-black shadow-sm",
-              u.avatar_color === "indigo" ? "bg-indigo-500" : "bg-emerald-500"
-            )}>
-              {(u.full_name || u.initials || u.id || "?").charAt(0).toUpperCase()}
+              "w-5 h-5 rounded-full border-2 border-[#0b1912] flex items-center justify-center text-[8px] font-black shadow-sm",
+              u.id === profile?.id ? "ring-2 ring-[#22c981] ring-offset-1 ring-offset-[#0b1912]" : ""
+            )} style={{ backgroundColor: u.avatar_color || "#1D9E75" }}>
+              {(u.full_name || u.initials || "U").charAt(0).toUpperCase()}
             </div>
           ))}
-          {activeUsers.length > 3 && (
+          {onlineCount > 3 && (
             <div className="w-5 h-5 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center text-[8px] font-bold text-slate-500 shadow-sm">
-              +{activeUsers.length - 3}
-            </div>
-          )}
-          {activeUsers.length === 0 && (
-            <div className="w-5 h-5 rounded-full bg-slate-800 border-2 border-slate-900 flex items-center justify-center text-[8px] font-bold text-slate-500 shadow-sm">
-              ?
+              +{onlineCount - 3}
             </div>
           )}
         </div>
-        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">
-          {activeUsers.length} <span className="text-slate-600 font-medium">{activeUsers.length === 1 ? "gebruiker" : "gebruikers"} online</span>
+        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/40">
+          {onlineCount} <span className="text-white/20 font-medium">{onlineCount === 1 ? "GEBRUIKER" : "GEBRUIKERS"} ONLINE</span>
         </span>
       </div>
       <div className="flex items-center gap-3">

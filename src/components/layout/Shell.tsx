@@ -3,9 +3,10 @@
 import React, { useState } from "react";
 import { SaveStatus } from "./SaveStatus";
 import {  useUIStore, useDataStore , useTechPackStore } from "@/store";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
+import DataManagement from "../settings/DataManagement";
 
 interface ShellProps {
   sidebar: React.ReactNode;
@@ -23,6 +24,8 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
     setActiveArticle,
     setActiveStep
   } = useTechPackStore();
+
+  const { isSettingsOpen, setSettingsOpen } = useUIStore();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -142,6 +145,37 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
       <section className="hidden xl:flex w-[380px] bg-white border-l border-[#1D9E75]/10 flex-shrink-0 flex flex-col">
         {preview}
       </section>
+
+      {/* ── SETTINGS MODAL (Moved from Sidebar for centering) ── */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-[#0b1912]/80 backdrop-blur-md flex items-center justify-center p-4" 
+            onClick={() => setSettingsOpen(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-2xl max-h-[90vh] bg-white rounded-[40px] overflow-hidden shadow-2xl relative" 
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="h-full overflow-y-auto p-10 custom-scrollbar">
+                <button 
+                  onClick={() => setSettingsOpen(false)} 
+                  className="absolute top-8 right-8 p-2 hover:bg-slate-100 rounded-full z-10 transition-colors"
+                >
+                  <Plus className="w-6 h-6 rotate-45 text-slate-400" />
+                </button>
+                <DataManagement />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
