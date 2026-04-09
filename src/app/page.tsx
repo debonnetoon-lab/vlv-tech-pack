@@ -139,9 +139,22 @@ export default function Home() {
 
   if (initializing) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-slate-900" />
-        <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Beveiligde verbinding maken...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 gap-6 p-4 text-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-[#0b1912]" />
+          <p className="text-xs font-bold uppercase tracking-widest text-[#0b1912]/40">Beveiligde verbinding maken...</p>
+        </div>
+        
+        {/* Noodknop / Fail-safe button */}
+        <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500 fill-mode-both">
+          <p className="text-[10px] text-slate-400 mb-2 uppercase tracking-tight">Duurt dit te lang?</p>
+          <button 
+            onClick={() => setInitializing(false)}
+            className="px-6 py-2.5 rounded-xl border border-slate-200 text-[#0b1912] text-[10px] font-black uppercase tracking-widest hover:bg-white hover:shadow-lg transition-all active:scale-95"
+          >
+            Direct naar inloggen
+          </button>
+        </div>
       </div>
     );
   }
