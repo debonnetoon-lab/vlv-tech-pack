@@ -7,7 +7,7 @@
 --  CLEANUP (Verwijdert testdata en oude structuur)
 -- ─────────────────────────────────────────────
 DROP TRIGGER IF EXISTS trg_on_auth_user_created ON auth.users CASCADE;
-DROP PUBLICATION IF EXISTS supabase_realtime;
+
 DROP TABLE IF EXISTS public.shares CASCADE;
 DROP TABLE IF EXISTS public.activity_log CASCADE;
 DROP TABLE IF EXISTS public.field_locks CASCADE;
