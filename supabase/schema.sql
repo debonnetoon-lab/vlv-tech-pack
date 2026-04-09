@@ -44,18 +44,58 @@ CREATE TABLE public.profiles (
 );
 
 -- ─────────────────────────────────────────────
---  TABEL: collections
+--  TABEL: organizations
 -- ─────────────────────────────────────────────
-CREATE TABLE public.collections (
+CREATE TABLE public.organizations (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name          TEXT NOT NULL,
-  season        TEXT,                             -- bijv. 'SS2025'
-  year          SMALLINT,
-  description   TEXT,
   created_by    UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ─────────────────────────────────────────────
+--  TABEL: organization_members
+-- ─────────────────────────────────────────────
+CREATE TABLE public.organization_members (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  role            TEXT NOT NULL DEFAULT 'member', -- 'owner' | 'admin' | 'member'
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(organization_id, user_id)
+);
+
+-- ─────────────────────────────────────────────
+--  TABEL: shares (Token based read access)
+-- ─────────────────────────────────────────────
+CREATE TABLE public.shares (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  collection_id   UUID, -- foreign key added later to avoid circular dependency
+  article_id      UUID, -- foreign key added later
+  token           TEXT NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(16), 'hex'),
+  created_by      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  expires_at      TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- ─────────────────────────────────────────────
+--  TABEL: collections
+-- ─────────────────────────────────────────────
+CREATE TABLE public.collections (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  name            TEXT NOT NULL,
+  season          TEXT,                             -- bijv. 'SS2025'
+  year            SMALLINT,
+  description     TEXT,
+  created_by      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Voeg foreign keys toe aan shares (nu collections en articles (hierna) bestaan)
+ALTER TABLE public.shares ADD CONSTRAINT fk_shares_collection FOREIGN KEY (collection_id) REFERENCES public.collections(id) ON DELETE CASCADE;
+-- Voor article_id doen we het nadat articles tabel is aangemaakt.
 
 -- ─────────────────────────────────────────────
 --  TABEL: articles  (kledingstukken / producten)
@@ -93,6 +133,8 @@ CREATE TABLE public.articles (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.shares ADD CONSTRAINT fk_shares_article FOREIGN KEY (article_id) REFERENCES public.articles(id) ON DELETE CASCADE;
 
 -- ─────────────────────────────────────────────
 --  TABEL: sizes  (Stap 2 — Afmetingen)
@@ -190,6 +232,8 @@ CREATE TABLE public.activity_log (
 -- ═══════════════════════════════════════════════
 --  INDEXEN
 -- ═══════════════════════════════════════════════
+CREATE INDEX idx_org_members_user       ON public.organization_members(user_id);
+CREATE INDEX idx_collections_org        ON public.collections(organization_id);
 CREATE INDEX idx_articles_collection    ON public.articles(collection_id);
 CREATE INDEX idx_articles_status        ON public.articles(status);
 CREATE INDEX idx_sizes_article          ON public.sizes(article_id);
@@ -200,6 +244,7 @@ CREATE INDEX idx_locks_article          ON public.field_locks(article_id);
 CREATE INDEX idx_locks_expires          ON public.field_locks(expires_at);
 CREATE INDEX idx_log_article            ON public.activity_log(article_id);
 CREATE INDEX idx_log_user               ON public.activity_log(user_id);
+CREATE INDEX idx_shares_token           ON public.shares(token);
 
 -- ═══════════════════════════════════════════════
 --  AUTOMATISCHE updated_at TRIGGERS
@@ -216,6 +261,10 @@ CREATE TRIGGER trg_profiles_updated
   BEFORE UPDATE ON public.profiles
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+CREATE TRIGGER trg_organizations_updated
+  BEFORE UPDATE ON public.organizations
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
 CREATE TRIGGER trg_collections_updated
   BEFORE UPDATE ON public.collections
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
@@ -229,12 +278,25 @@ CREATE TRIGGER trg_articles_updated
 -- ═══════════════════════════════════════════════
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  new_org_id UUID;
+  user_name TEXT;
 BEGIN
+  user_name := COALESCE(NEW.raw_user_meta_data->>'full_name', SPLIT_PART(NEW.email, '@', 1));
+
+  -- 1. Create Profile
   INSERT INTO public.profiles (id, full_name)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', SPLIT_PART(NEW.email, '@', 1))
-  );
+  VALUES (NEW.id, user_name);
+
+  -- 2. Create Personal Organization
+  INSERT INTO public.organizations (name, created_by)
+  VALUES (user_name || ' Workspace', NEW.id)
+  RETURNING id INTO new_org_id;
+
+  -- 3. Add user as owner of their Workspace
+  INSERT INTO public.organization_members (organization_id, user_id, role)
+  VALUES (new_org_id, NEW.id, 'owner');
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -254,10 +316,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ═══════════════════════════════════════════════
---  ROW LEVEL SECURITY (RLS)
+--  ROW LEVEL SECURITY (RLS) - SaaS MODEL
 -- ═══════════════════════════════════════════════
 
 -- Activeer RLS op alle tabellen
+ALTER TABLE public.organizations      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.organization_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.collections        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.articles           ENABLE ROW LEVEL SECURITY;
@@ -267,31 +331,76 @@ ALTER TABLE public.pantone_colors     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.article_images     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.field_locks        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_log       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shares             ENABLE ROW LEVEL SECURITY;
 
--- PROFILES: iedereen kan lezen, enkel eigen profiel bewerken
+-- ── HELPER FUNCTIE VOOR RLS ──
+CREATE OR REPLACE FUNCTION public.is_member_of(_org_id UUID)
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.organization_members
+    WHERE organization_id = _org_id AND user_id = auth.uid()
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ORGANIZATIONS
+CREATE POLICY "org_select" ON public.organizations FOR SELECT TO authenticated USING (public.is_member_of(id));
+CREATE POLICY "org_update" ON public.organizations FOR UPDATE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.organization_members WHERE organization_id = id AND user_id = auth.uid() AND role IN ('owner', 'admin'))
+);
+
+-- ORGANIZATION MEMBERS
+CREATE POLICY "members_select" ON public.organization_members FOR SELECT TO authenticated USING (public.is_member_of(organization_id));
+
+-- PROFILES
 CREATE POLICY "profiles_select_all"   ON public.profiles FOR SELECT TO authenticated USING (true);
 CREATE POLICY "profiles_update_own"   ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
 
--- COLLECTIONS: alle ingelogde gebruikers
-CREATE POLICY "collections_select"    ON public.collections FOR SELECT TO authenticated USING (true);
-CREATE POLICY "collections_insert"    ON public.collections FOR INSERT TO authenticated WITH CHECK (auth.uid() = created_by);
-CREATE POLICY "collections_update"    ON public.collections FOR UPDATE TO authenticated USING (true);
-CREATE POLICY "collections_delete"    ON public.collections FOR DELETE TO authenticated USING (auth.uid() = created_by);
+-- COLLECTIONS
+CREATE POLICY "collections_select"    ON public.collections FOR SELECT TO authenticated USING (public.is_member_of(organization_id));
+CREATE POLICY "collections_insert"    ON public.collections FOR INSERT TO authenticated WITH CHECK (public.is_member_of(organization_id));
+CREATE POLICY "collections_update"    ON public.collections FOR UPDATE TO authenticated USING (public.is_member_of(organization_id));
+CREATE POLICY "collections_delete"    ON public.collections FOR DELETE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.organization_members WHERE organization_id = collections.organization_id AND user_id = auth.uid() AND role IN ('owner', 'admin'))
+);
 
--- ARTICLES: alle ingelogde gebruikers
-CREATE POLICY "articles_select"       ON public.articles FOR SELECT TO authenticated USING (true);
-CREATE POLICY "articles_insert"       ON public.articles FOR INSERT TO authenticated WITH CHECK (auth.uid() = created_by);
-CREATE POLICY "articles_update"       ON public.articles FOR UPDATE TO authenticated USING (true);
-CREATE POLICY "articles_delete"       ON public.articles FOR DELETE TO authenticated USING (auth.uid() = created_by);
+-- ARTICLES
+CREATE POLICY "articles_select" ON public.articles FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_id AND public.is_member_of(c.organization_id))
+);
+CREATE POLICY "articles_insert" ON public.articles FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_id AND public.is_member_of(c.organization_id))
+);
+CREATE POLICY "articles_update" ON public.articles FOR UPDATE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_id AND public.is_member_of(c.organization_id))
+);
+CREATE POLICY "articles_delete" ON public.articles FOR DELETE TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_id AND public.is_member_of(c.organization_id))
+);
 
--- SUB-TABELLEN: iedereen kan lezen/schrijven als ze ingelogd zijn
-CREATE POLICY "sizes_all"             ON public.sizes             FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "artwork_all"           ON public.artwork_placements FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "pantone_all"           ON public.pantone_colors    FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "images_all"            ON public.article_images    FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "locks_all"             ON public.field_locks       FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE POLICY "log_select"            ON public.activity_log      FOR SELECT TO authenticated USING (true);
-CREATE POLICY "log_insert"            ON public.activity_log      FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+-- SUB-TABELLEN (Relate back to articles)
+CREATE POLICY "sizes_all"             ON public.sizes             FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id))
+) WITH CHECK (true);
+CREATE POLICY "artwork_all"           ON public.artwork_placements FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id))
+) WITH CHECK (true);
+CREATE POLICY "pantone_all"           ON public.pantone_colors    FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id))
+) WITH CHECK (true);
+CREATE POLICY "images_all"            ON public.article_images    FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id))
+) WITH CHECK (true);
+CREATE POLICY "locks_all"             ON public.field_locks       FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id))
+) WITH CHECK (true);
+
+-- SHARES (enkel inzien als owner van de collectie/article)
+CREATE POLICY "shares_select" ON public.shares FOR SELECT TO authenticated USING (
+  (collection_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_id AND public.is_member_of(c.organization_id)))
+  OR 
+  (article_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id)))
+);
+CREATE POLICY "shares_insert" ON public.shares FOR INSERT TO authenticated WITH CHECK (auth.uid() = created_by);
 
 -- ═══════════════════════════════════════════════
 --  REALTIME PUBLICATIE
