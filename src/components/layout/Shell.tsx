@@ -53,12 +53,14 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
 
   const resetToCollection = () => {
     setActiveArticle(null);
+    setSettingsOpen(false);
   };
 
   const resetToCollections = () => {
     setActiveCollection(null);
     setActiveArticle(null);
     setIsMobileMenuOpen(false);
+    setSettingsOpen(false);
   };
 
   return (
@@ -151,7 +153,7 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
         {/* WIZARD SCROLL AREA */}
         <main className="flex-1 overflow-y-auto custom-scrollbar">
           <div className="max-w-4xl mx-auto p-6 lg:p-16 pb-40">
-            {form}
+            {isSettingsOpen ? <DataManagement /> : form}
           </div>
         </main>
       </div>
@@ -161,36 +163,6 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
         {preview}
       </section>
 
-      {/* ── SETTINGS MODAL (Moved from Sidebar for centering) ── */}
-      <AnimatePresence>
-        {isSettingsOpen && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[200] bg-[#0b1912]/80 backdrop-blur-md flex items-center justify-center p-4" 
-            onClick={() => setSettingsOpen(false)}
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="w-full max-w-2xl max-h-[90vh] bg-white rounded-[40px] overflow-hidden shadow-2xl relative" 
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="h-full overflow-y-auto p-10 custom-scrollbar">
-                <button 
-                  onClick={() => setSettingsOpen(false)} 
-                  className="absolute top-8 right-8 p-2 hover:bg-slate-100 rounded-full z-10 transition-colors"
-                >
-                  <Plus className="w-6 h-6 rotate-45 text-slate-400" />
-                </button>
-                <DataManagement />
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
