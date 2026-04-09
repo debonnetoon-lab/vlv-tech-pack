@@ -6,7 +6,12 @@ import {  useUIStore, useDataStore , useTechPackStore } from "@/store";
 import { Menu, X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import DataManagement from "../settings/DataManagement";
+import dynamic from "next/dynamic";
+
+const DataManagement = dynamic(() => import("../settings/DataManagement"), {
+  ssr: false,
+  loading: () => <div className="p-10 flex items-center justify-center"><Plus className="w-8 h-8 animate-spin text-slate-200" /></div>
+});
 
 interface ShellProps {
   sidebar: React.ReactNode;
