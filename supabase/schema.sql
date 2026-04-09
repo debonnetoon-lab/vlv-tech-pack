@@ -446,14 +446,17 @@ VALUES ('tech-pack-assets', 'tech-pack-assets', true)
 ON CONFLICT DO NOTHING;
 
 -- Storage policies
+DROP POLICY IF EXISTS "assets_select_all" ON storage.objects;
 CREATE POLICY "assets_select_all"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'tech-pack-assets');
 
+DROP POLICY IF EXISTS "assets_insert_authenticated" ON storage.objects;
 CREATE POLICY "assets_insert_authenticated"
   ON storage.objects FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'tech-pack-assets');
 
+DROP POLICY IF EXISTS "assets_delete_authenticated" ON storage.objects;
 CREATE POLICY "assets_delete_authenticated"
   ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'tech-pack-assets');
