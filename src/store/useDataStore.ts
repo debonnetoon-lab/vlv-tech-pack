@@ -310,14 +310,15 @@ export const useDataStore = create<DataStore>()(
         const { organizationId, logActivity } = getData();
         let orgId = organizationId;
 
+        // Fetch user once, at top level so it's always in scope
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          alert("Sessie verlopen. Log opnieuw in.");
+          return;
+        }
+
         // Ensure we have an organization ID
         if (!orgId) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) {
-            alert("Sessie verlopen. Log opnieuw in.");
-            return;
-          }
-          
           // Fallback check if store is out of sync
           const { data: orgMember } = await supabase
             .from('organization_members')
