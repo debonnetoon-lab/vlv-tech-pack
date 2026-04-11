@@ -50,6 +50,7 @@ CREATE TABLE public.collections (
   id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
   name            TEXT NOT NULL,
+  description     TEXT,
   season          TEXT CHECK (season IN ('SS','FW','Resort','Cruise')),
   year            INT,
   status          TEXT CHECK (status IN ('draft','active','archived')) DEFAULT 'draft',

@@ -18,8 +18,9 @@ const QUICK_COLORS = [
 ];
 
 export default function Step4Kleuren({ article, collectionId }: { article: any, collectionId: string }) {
-  const { updateProduct } = useTechPackStore();
+  const { updateProduct, userRole } = useTechPackStore();
   const { missingFields } = useTechPackValidation(article);
+  const isViewer = userRole === 'viewer';
   const isError = missingFields.some(f => f.step === 4 && f.field === 'colorways');
 
   const addColor = (color?: any) => {
@@ -56,8 +57,12 @@ export default function Step4Kleuren({ article, collectionId }: { article: any, 
           <p className="text-slate-400 font-medium">Definieer de kleurencombinaties voor dit product.</p>
         </div>
         <button 
-          onClick={() => addColor()}
-          className="flex items-center gap-2 h-12 px-6 bg-[#0b1912] text-[#22c981] rounded-2xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-[#22c981]/10"
+          onClick={() => !isViewer && addColor()}
+          disabled={isViewer}
+          className={cn(
+            "flex items-center gap-2 h-12 px-6 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-2xl",
+            isViewer ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-[#0b1912] text-[#22c981] hover:scale-105 active:scale-95 shadow-[#22c981]/10"
+          )}
         >
           <Plus className="w-4 h-4" />
           Kleur Toevoegen
@@ -103,8 +108,12 @@ export default function Step4Kleuren({ article, collectionId }: { article: any, 
                   <input 
                     type="color" 
                     value={c.hex_code} 
-                    onChange={(e) => updateColor(c.id, { hex_code: e.target.value })}
-                    className="w-20 h-20 rounded-2xl border-none p-0 cursor-pointer overflow-hidden shadow-inner"
+                    disabled={isViewer}
+                    onChange={(e) => !isViewer && updateColor(c.id, { hex_code: e.target.value })}
+                    className={cn(
+                      "w-20 h-20 rounded-2xl border-none p-0 cursor-pointer overflow-hidden shadow-inner",
+                      isViewer && "cursor-not-allowed opacity-50"
+                    )}
                   />
                   <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg border border-slate-50">
                      <Palette className="w-4 h-4 text-[#22c981]" />
@@ -116,8 +125,12 @@ export default function Step4Kleuren({ article, collectionId }: { article: any, 
                     <Label className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Kleur Naam</Label>
                     <input 
                       value={c.name}
-                      onChange={(e) => updateColor(c.id, { name: e.target.value })}
-                      className="w-full bg-transparent border-none outline-none font-black text-slate-900 uppercase italic tracking-tight text-lg placeholder:text-slate-100"
+                      disabled={isViewer}
+                      onChange={(e) => !isViewer && updateColor(c.id, { name: e.target.value })}
+                      className={cn(
+                        "w-full bg-transparent border-none outline-none font-black text-slate-900 uppercase italic tracking-tight text-lg placeholder:text-slate-100",
+                        isViewer && "opacity-60 cursor-not-allowed"
+                      )}
                     />
                   </div>
                   <div className="flex items-center gap-4">
@@ -125,17 +138,23 @@ export default function Step4Kleuren({ article, collectionId }: { article: any, 
                       <Label className="text-[8px] font-bold text-slate-400 uppercase tracking-widest ml-1">Pantone</Label>
                       <input 
                         value={c.pantone_code}
-                        onChange={(e) => updateColor(c.id, { pantone_code: e.target.value })}
+                        disabled={isViewer}
+                        onChange={(e) => !isViewer && updateColor(c.id, { pantone_code: e.target.value })}
                         placeholder="bv. 3272 C"
-                        className="w-full bg-slate-50 border-none rounded-lg px-2 py-1 text-[10px] font-bold text-slate-600 outline-none focus:bg-emerald-50 focus:text-emerald-600 transition-colors"
+                        className={cn(
+                          "w-full bg-slate-50 border-none rounded-lg px-2 py-1 text-[10px] font-bold text-slate-600 outline-none transition-colors",
+                          isViewer ? "cursor-not-allowed opacity-60" : "focus:bg-emerald-50 focus:text-emerald-600"
+                        )}
                       />
                     </div>
-                    <button 
-                      onClick={() => removeColor(c.id)}
-                      className="mt-4 p-2.5 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {!isViewer && (
+                      <button 
+                        onClick={() => removeColor(c.id)}
+                        className="mt-4 p-2.5 text-slate-200 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </motion.div>

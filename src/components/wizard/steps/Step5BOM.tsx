@@ -2,14 +2,16 @@
 
 import React from "react";
 import { useTechPackStore } from "@/store";
-import { Calculator, AlertCircle } from "lucide-react";
+import { Calculator, AlertCircle, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useTechPackValidation } from "@/hooks/useTechPackValidation";
+import { sanitizeQuantity } from "@/lib/order-utils";
 
 export default function Step5BOM({ article, collectionId }: { article: any, collectionId: string }) {
-  const { updateProduct } = useTechPackStore();
+  const { updateProduct, userRole } = useTechPackStore();
   const { missingFields } = useTechPackValidation(article);
+  const isViewer = userRole === 'viewer';
   const isError = missingFields.some(f => f.step === 7 && f.field === 'order_quantity');
   
   const totalQuantity = (article.sizes || []).reduce((acc: number, s: any) => acc + (s.order_quantity || 0), 0);

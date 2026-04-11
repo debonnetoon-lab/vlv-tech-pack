@@ -67,7 +67,8 @@ const REFERENCE_POINTS = [
 ];
 
 export default function Step3PrintPlaatsing({ article, collectionId }: { article: TechPackProduct, collectionId: string }) {
-  const { updateProduct } = useTechPackStore();
+  const { updateProduct, userRole } = useTechPackStore();
+  const isViewer = userRole === 'viewer';
   const { missingFields } = useTechPackValidation(article);
 
   const getPlacementError = (index: number, field: string) => {
@@ -76,6 +77,7 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
   };
 
   const addPlacement = (position: string) => {
+    if (isViewer) return;
     const currentPlacements = article.placements || [];
     const newPlacements: ArtworkPlacement[] = [
       ...currentPlacements,
@@ -98,6 +100,7 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
   };
 
   const updatePlacement = (index: number, updates: Partial<ArtworkPlacement>) => {
+    if (isViewer) return;
     const currentPlacements = [...(article.placements || [])];
     if (currentPlacements[index]) {
       currentPlacements[index] = { ...currentPlacements[index], ...updates };
@@ -106,6 +109,7 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
   };
 
   const removePlacement = (index: number) => {
+    if (isViewer) return;
     const currentPlacements = article.placements || [];
     updateProduct(collectionId, article.id, {
       placements: currentPlacements.filter((_, i) => i !== index)
@@ -115,6 +119,7 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
   const [uploadingIndex, setUploadingIndex] = React.useState<number | null>(null);
 
   const handlePlacementArtworkUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isViewer) return;
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -143,7 +148,7 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
   };
 
   const applyAIMeasurement = () => {
-    if (!article.ai_measurement) return;
+    if (isViewer || !article.ai_measurement) return;
     
     const { width_cm, height_cm, pos_under_neck_cm, technique } = article.ai_measurement.print;
     
@@ -187,7 +192,11 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
               </div>
               <Button 
                 onClick={applyAIMeasurement}
-                className="bg-orange-500 hover:bg-orange-600 text-white rounded-2xl px-8 h-12 font-black uppercase tracking-widest shadow-xl shadow-orange-500/20 active:scale-95 transition-all"
+                disabled={isViewer}
+                className={cn(
+                  "rounded-2xl px-8 h-12 font-black uppercase tracking-widest shadow-xl active:scale-95 transition-all",
+                  isViewer ? "bg-slate-100 text-slate-400 cursor-not-allowed" : "bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/20"
+                )}
               >
                 Gebruik AI Maten
               </Button>
@@ -204,7 +213,8 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
                 key={p.id}
                 variant="outline"
                 className="h-20 flex flex-col gap-2 border-slate-100 hover:border-slate-900 hover:bg-slate-50 rounded-[20px] shadow-sm transition-all group"
-                onClick={() => addPlacement(p.id)}
+                onClick={() => !isViewer && addPlacement(p.id)}
+                disabled={isViewer}
               >
                 <span className="text-2xl group-hover:scale-110 transition-transform">{p.icon}</span>
                 <span className="text-[9px] font-black uppercase tracking-tight text-slate-400 group-hover:text-slate-900 leading-none">{p.label}</span>
@@ -224,12 +234,14 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
                 "p-10 border rounded-[40px] bg-white shadow-xl space-y-10 relative group animate-in zoom-in-95 duration-300",
                 (techError || dimError || distError) ? "border-red-100 ring-2 ring-red-50" : "border-slate-100"
               )}>
-                <button 
-                  onClick={() => removePlacement(i)}
-                  className="absolute top-8 right-8 text-slate-300 hover:text-red-500 transition-colors bg-slate-50 hover:bg-red-50 p-2.5 rounded-full"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
+                {!isViewer && (
+                  <button 
+                    onClick={() => removePlacement(i)}
+                    className="absolute top-8 right-8 text-slate-300 hover:text-red-500 transition-colors bg-slate-50 hover:bg-red-50 p-2.5 rounded-full"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
 
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                   <div className="flex items-center gap-6">
@@ -259,10 +271,11 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
                         onChange={(e) => handlePlacementArtworkUpload(i, e)}
                       />
                       <label 
-                        htmlFor={`placement-artwork-${i}`}
+                        htmlFor={isViewer ? undefined : `placement-artwork-${i}`}
                         className={cn(
-                          "flex flex-col items-center justify-center w-36 h-24 rounded-[24px] border-2 border-dashed transition-all cursor-pointer overflow-hidden relative shadow-sm",
-                          p.artwork_url ? "border-[#22c981]/30 bg-[#22c981]/5" : "border-slate-100 bg-slate-50 hover:border-slate-300"
+                          "flex flex-col items-center justify-center w-36 h-24 rounded-[24px] border-2 border-dashed transition-all relative shadow-sm",
+                          p.artwork_url ? "border-[#22c981]/30 bg-[#22c981]/5" : "border-slate-100 bg-slate-50 hover:border-slate-300",
+                          isViewer ? "cursor-not-allowed opacity-60" : "cursor-pointer"
                         )}
                       >
                         {uploadingIndex === i ? (

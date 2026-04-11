@@ -4,6 +4,7 @@
 import React from "react";
 import { useFieldLock } from "@/hooks/useFieldLock";
 import { Lock } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface FieldWrapperProps {

@@ -158,6 +158,7 @@ export interface Collection {
   season?: string;
   year?: number;
   status: 'draft' | 'active' | 'archived';
+  description?: string;
   cover_image_url?: string;
   products: TechPackProduct[];
 }

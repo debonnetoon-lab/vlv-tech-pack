@@ -19,7 +19,8 @@ const DROPZONES: { id: ProductImage['view']; title: string; desc: string }[] = [
 ];
 
 export default function Step2Afbeeldingen({ article, collectionId }: { article: TechPackProduct, collectionId: string }) {
-  const { updateProduct, uploadProductImage } = useTechPackStore();
+  const { updateProduct, uploadProductImage, userRole } = useTechPackStore();
+  const isViewer = userRole === 'viewer';
   const { missingFields } = useTechPackValidation(article);
   const [isAnalyzing, setIsAnalyzing] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState<string | null>(null);
@@ -32,7 +33,7 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
   };
 
   const handleAIAnalyze = async (image: ProductImage) => {
-    if (!image.public_url) return;
+    if (isViewer || !image.public_url) return;
     setIsAnalyzing(true);
     try {
       const response = await fetch("/api/measure-print", {
@@ -58,6 +59,7 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent, view: ProductImage["view"]) => {
+    if (isViewer) return;
     let file: File | undefined;
     if ('target' in e && (e.target as HTMLInputElement).files) {
       file = (e.target as HTMLInputElement).files?.[0];
@@ -96,6 +98,7 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
   };
 
   const removeImage = async (imageId: string) => {
+    if (isViewer) return;
     setIsDeleting(imageId);
     try {
       const { error } = await supabase.from('product_files').delete().eq('id', imageId);
@@ -161,20 +164,22 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
                    {zone.id === "front" && article.ai_measurement && !isUploading && (
                       <AIPrintOverlay measurement={article.ai_measurement} />
                    )}
-                   <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                     <button 
-                        type="button"
-                        disabled={(isDeleting === image?.id) || (isUploading === zone.id)}
-                        onClick={(e) => {
-                           e.preventDefault();
-                           e.stopPropagation();
-                           if (image?.id) removeImage(image.id);
-                        }}
-                        className="p-4 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all shadow-2xl disabled:opacity-50 hover:scale-110 active:scale-95"
-                      >
-                       {isDeleting === image?.id ? <Loader2 className="w-6 h-6 animate-spin" /> : <Trash2 className="w-6 h-6" />}
-                     </button>
-                   </div>
+                   {!isViewer && (
+                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                      <button 
+                         type="button"
+                         disabled={(isDeleting === image?.id) || (isUploading === zone.id)}
+                         onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (image?.id) removeImage(image.id);
+                         }}
+                         className="p-4 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all shadow-2xl disabled:opacity-50 hover:scale-110 active:scale-95"
+                       >
+                        {isDeleting === image?.id ? <Loader2 className="w-6 h-6 animate-spin" /> : <Trash2 className="w-6 h-6" />}
+                      </button>
+                    </div>
+                   )}
                    <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between pointer-events-none z-10">
                       <span className="px-4 py-2 bg-white/95 backdrop-blur rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl border border-slate-100">
                         {isUploading === zone.id ? "Synchroniseren..." : (image?.file_name || "Lokaal Bestand")}
@@ -209,7 +214,11 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
                 >
                   <input
                     type="file"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    disabled={isViewer}
+                    className={cn(
+                      "absolute inset-0 w-full h-full opacity-0 z-10",
+                      isViewer ? "cursor-not-allowed" : "cursor-pointer"
+                    )}
                     onChange={(e) => handleFileUpload(e, zone.id as any)}
                     accept="image/*,.ai,.pdf"
                   />

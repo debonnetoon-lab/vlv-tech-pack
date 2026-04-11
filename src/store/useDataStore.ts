@@ -7,6 +7,7 @@ import { useUIStore } from "./useUIStore";
 import { useCollaborationStore } from "./useCollaborationStore";
 import { TechPackProduct, Collection, ProductImage } from "@/types/tech-pack";
 import { PresenceUser } from "@/types/collaboration";
+import imageCompression from 'browser-image-compression';
 
 // Helper to debounce async functions
 function debounceAsync<T extends (...args: any[]) => Promise<any>>(
@@ -613,10 +614,39 @@ export const useDataStore = create<DataStore>()(
       },
 
       uploadProductImage: async (productId: string, file: File, view: ProductImage['view']) => {
+        // Validation: Limit raw file size to 15MB before even attempting compression
+        if (file.size > 15 * 1024 * 1024) {
+          throw new Error("Bestand is te groot (max 15MB).");
+        }
+
+        let fileToUpload = file;
+        
+        // Compression for images
+        if (file.type.startsWith('image/')) {
+          set({ uploadProgress: 10 });
+          const options = {
+            maxSizeMB: 2,
+            maxWidthOrHeight: 2000,
+            useWebWorker: true,
+            onProgress: (p: number) => set({ uploadProgress: 10 + (p * 0.8) })
+          };
+          try {
+            fileToUpload = await imageCompression(file, options);
+          } catch (error) {
+            console.error("Compression failed, uploading original:", error);
+          }
+        }
+
         const fileExt = file.name.split('.').pop();
         const fileName = `${productId}/${view}_${Date.now()}.${fileExt}`;
-        const { data: uploadData, error: uploadErr } = await supabase.storage.from('tech-pack-assets').upload(fileName, file);
-        if (uploadErr || !uploadData) throw new Error("Upload failed: " + uploadErr?.message);
+        
+        set({ uploadProgress: 90 });
+        const { data: uploadData, error: uploadErr } = await supabase.storage.from('tech-pack-assets').upload(fileName, fileToUpload);
+        
+        if (uploadErr || !uploadData) {
+          set({ uploadProgress: 0 });
+          throw new Error("Upload failed: " + uploadErr?.message);
+        }
 
         const { data: { publicUrl } } = supabase.storage.from('tech-pack-assets').getPublicUrl(uploadData.path);
         
@@ -629,8 +659,10 @@ export const useDataStore = create<DataStore>()(
           file_name: file.name
         }]);
 
-        if (dbErr) throw dbErr;
+        set({ uploadProgress: 100 });
+        setTimeout(() => set({ uploadProgress: 0 }), 1000);
 
+        if (dbErr) throw dbErr;
         return publicUrl;
       }
     }),
