@@ -345,7 +345,8 @@ export const useDataStore = create<DataStore>()(
             name, 
             organization_id: orgId,
             season: details?.season || "",
-            year: details?.year || new Date().getFullYear()
+            year: details?.year || new Date().getFullYear(),
+            created_by: user.id
           }])
           .select()
           .single();

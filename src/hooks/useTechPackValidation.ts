@@ -30,7 +30,7 @@ export const useTechPackValidation = (product: TechPackProduct | null): Validati
     // Step 1: Algemeen
     if (!product.name || product.name.trim() === '') addError(1, "Product Naam", "name");
     if (!product.article_code || product.article_code.trim() === '') addError(1, "Artikel Code", "article_code");
-    if (!product.article_type) addError(1, "Product Type", "article_type");
+    if (!product.garment_type) addError(1, "Product Type", "garment_type");
 
     // Step 2: Visuals
     const images = product.images || [];
