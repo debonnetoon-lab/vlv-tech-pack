@@ -135,6 +135,7 @@ const Watermark = ({ isApproved }: { isApproved: boolean }) => (
         ctx.fillText(label, -200, i * 150);
       }
       ctx.restore();
+      return null;
     }}
   />
 );
