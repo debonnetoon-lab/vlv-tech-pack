@@ -3,110 +3,81 @@
 import React from "react";
 import { useTechPackStore } from "@/store";
 import { cn } from "@/lib/utils";
-import { Check } from "lucide-react";
+import { 
+  CheckCircle2, 
+  Info, 
+  Image as ImageIcon, 
+  Droplets, 
+  Palette, 
+  Ruler, 
+  Hammer, 
+  ListChecks, 
+  Tag,
+  Download
+} from "lucide-react";
+import { motion } from "framer-motion";
 
 const STEPS = [
-  { id: 1, title: "Basisgegevens", sub: "Wat maak je?", shortcut: "⌘1" },
-  { id: 2, title: "Afbeeldingen", sub: "Voeg visuals toe", shortcut: "⌘2" },
-  { id: 3, title: "Print & Plaatsing", sub: "Waar komt het?", shortcut: "⌘3" },
-  { id: 4, title: "Kleuren", sub: "Welke kleuren?", shortcut: "⌘4" },
-  { id: 5, title: "Materiaallijst", sub: "Bill of Materials (BOM)", shortcut: "⌘5" },
-  { id: 6, title: "Maattabel", sub: "Technische specs", shortcut: "⌘6" },
-  { id: 7, title: "Labels & Verpakking", sub: "Afwerking details", shortcut: "⌘7" },
-  { id: 8, title: "Controle", sub: "Alles nakijken", shortcut: "⌘8" },
-  { id: 9, title: "Maten & Aantallen", sub: "Bestelling details", shortcut: "⌘9" },
-  { id: 10, title: "Klaar voor Export", sub: "Download PDF", shortcut: "⌘0" },
+  { id: 1, type: 'general', title: "Algemeen", icon: Info },
+  { id: 2, type: 'sketches', title: "Visuals", icon: ImageIcon },
+  { id: 3, type: 'prints', title: "Prints", icon: Palette },
+  { id: 4, type: 'colorways', title: "Colorways", icon: Droplets },
+  { id: 5, type: 'materials', title: "Materialen", icon: Droplets },
+  { id: 6, type: 'size specs', title: "Size Specs", icon: Ruler },
+  { id: 7, type: 'order qty', title: "Order QTY", icon: ListChecks },
+  { id: 8, type: 'labels', title: "Labels", icon: Tag },
+  { id: 9, type: 'export', title: "Export", icon: Download },
 ];
 
 export default function WizardStepper() {
-  const { activeStep, setActiveStep, activeArticleId } = useTechPackStore();
-
-  if (!activeArticleId) return null;
-
-  const progress = (activeStep / STEPS.length) * 100;
+  const { activeStep, setActiveStep } = useTechPackStore();
 
   return (
-    <div className="flex flex-col gap-0 p-3">
-      {/* Step Counter & Progress Bar */}
-      <div className="px-1 mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-[9px] font-black text-[#2a5a40] uppercase tracking-[0.15em]">Stappenplan</h3>
-          <span className="text-[9px] font-bold text-[#2a5a40]">{activeStep} / {STEPS.length}</span>
-        </div>
-        <div className="h-[2px] w-full bg-[#0b1912]/5 rounded-full overflow-hidden">
-          <div 
-            className="h-full bg-[#22c981] transition-all duration-500 ease-out shadow-[0_0_8px_rgba(34,201,129,0.4)]" 
-            style={{ width: `${progress}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-0 relative">
+    <div className="w-full bg-white border-b border-slate-100 px-8 py-2 sticky top-0 z-40">
+      <div className="flex items-center justify-between max-w-[1600px] mx-auto overflow-x-auto no-scrollbar gap-2">
         {STEPS.map((step, index) => {
           const isActive = activeStep === step.id;
           const isCompleted = activeStep > step.id;
-          const isLast = index === STEPS.length - 1;
 
           return (
-            <div key={step.id} className="relative">
-              {!isLast && (
-                <div className={cn(
-                  "absolute left-[19px] top-[40px] w-[1px] h-[calc(100%-20px)] transition-colors duration-300 z-0",
-                  isCompleted ? "bg-[#22c981]/30" : "bg-[#0b1912]/10"
-                )} />
+            <button
+              key={step.id}
+              onClick={() => setActiveStep(step.id)}
+              className={cn(
+                "flex items-center gap-3 px-5 py-4 min-w-max border-b-2 transition-all relative group",
+                isActive 
+                  ? "border-[#22c981] text-slate-900" 
+                  : "border-transparent text-slate-400 hover:text-slate-600 hover:border-slate-200"
               )}
+            >
+              <div className={cn(
+                "w-8 h-8 rounded-xl flex items-center justify-center transition-all",
+                isActive 
+                  ? "bg-[#22c981] text-[#0b1912] shadow-lg shadow-[#22c981]/20" 
+                  : (isCompleted ? "bg-emerald-50 text-emerald-500" : "bg-slate-50 text-slate-400")
+              )}>
+                {isCompleted ? <CheckCircle2 className="w-4 h-4" /> : <step.icon className="w-4 h-4" />}
+              </div>
               
-              <button
-                onClick={() => setActiveStep(step.id)}
-                className={cn(
-                  "relative z-10 w-full flex items-center gap-4 p-2.5 rounded-xl transition-all text-left group",
-                  isActive 
-                    ? "bg-[#22c981]/10 border border-[#22c981]/20 shadow-sm" 
-                    : "hover:bg-[#0b1912]/5"
-                )}
-              >
-                <div className={cn(
-                  "w-[22px] h-[22px] rounded-md flex items-center justify-center text-[10px] font-bold transition-all duration-300 shrink-0",
-                  isActive 
-                    ? "bg-[#22c981] text-[#0b1912] shadow-[0_0_10px_rgba(34,201,129,0.3)]" 
-                    : (isCompleted 
-                        ? "bg-[#22c981]/15 text-[#22c981]" 
-                        : "bg-[#0b1912]/5 text-[#2a5040]/60")
+              <div className="text-left">
+                <p className={cn(
+                  "text-[10px] font-black uppercase tracking-widest leading-none mb-1",
+                  isActive ? "text-[#22c981]" : "text-slate-300"
                 )}>
-                  {isCompleted ? <Check className="w-3 h-3 stroke-[3px]" /> : step.id}
-                </div>
-                
-                <div className="flex-1 min-w-0">
-                  <p className={cn(
-                    "text-[12px] font-bold leading-tight mb-0.5 transition-colors",
-                    isActive ? "text-[#0b1912]" : (isCompleted ? "text-[#2d7a55]" : "text-[#5a8a6a]")
-                  )}>
-                    {step.title}
-                  </p>
-                  <p className={cn(
-                    "text-[10px] truncate transition-colors",
-                    isActive ? "text-[#22c981]" : "text-[#1d4a30]/60"
-                  )}>
-                    {step.sub}
-                  </p>
-                </div>
+                  Stap 0{index + 1}
+                </p>
+                <p className="text-xs font-black uppercase tracking-tight whitespace-nowrap">
+                  {step.title}
+                </p>
+              </div>
 
-                <div className="flex items-center gap-2">
-                   <span className={cn(
-                     "text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-[#0b1912]/5 text-[#2a4a35]/60 transition-opacity duration-300",
-                     isActive || "group-hover:opacity-100 opacity-0"
-                   )}>
-                     {step.shortcut}
-                   </span>
-                   <span className={cn(
-                     "text-[12px] text-[#22c981] transition-all duration-300",
-                     isActive ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-2"
-                   )}>
-                     ›
-                   </span>
-                </div>
-              </button>
-            </div>
+              {isActive && (
+                <motion.div 
+                  layoutId="activeTabIndicator"
+                  className="absolute bottom-[-2px] left-0 right-0 h-[2px] bg-[#22c981] shadow-[0_0_10px_rgba(34,201,129,0.5)]"
+                />
+              )}
+            </button>
           );
         })}
       </div>

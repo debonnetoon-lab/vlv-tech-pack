@@ -8,6 +8,7 @@ import { Users, Info, Loader2 } from "lucide-react";
 import {  useDataStore, useCollaborationStore , useTechPackStore } from "@/store";
 import { supabase } from "@/lib/supabase";
 import LoginForm from "@/components/auth/LoginForm";
+import RegisterForm from "@/components/auth/RegisterForm";
 import { cn } from "@/lib/utils";
 
 function PresenceBanner() {
@@ -92,7 +93,8 @@ import { useSocket } from "@/hooks/useSocket";
 
 export default function Home() {
   const { user, setUser, fetchCollections } = useTechPackStore();
-  const [initializing, setInitializing] = React.useState(false);
+  const [initializing, setInitializing] = React.useState(true);
+  const [authView, setAuthView] = React.useState<"login" | "register">("login");
   
   // Start socket connection when logged in
   useSocket();
@@ -100,9 +102,10 @@ export default function Home() {
   React.useEffect(() => {
     // Initial check with timeout to prevent hanging on Vercel
     const initAuth = async () => {
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Timeout")), 1500)
-      );
+      let timeoutId: NodeJS.Timeout;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("Timeout")), 15000);
+      });
 
       try {
         const { data: { session } } = await Promise.race([
@@ -110,11 +113,13 @@ export default function Home() {
           timeoutPromise
         ]) as any;
 
+        clearTimeout(timeoutId!);
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchCollections();
         }
       } catch (err) {
+        if (typeof timeoutId! !== 'undefined') clearTimeout(timeoutId);
         console.error("Auth init error or timeout:", err);
       } finally {
         setInitializing(false);
@@ -134,27 +139,30 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, [setUser, fetchCollections]);
 
+  if (initializing) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0b1912] text-[#22c981]">
+        <Loader2 className="w-10 h-10 animate-spin mb-4" />
+        <h1 className="font-black italic tracking-tighter uppercase">Initializing VLV...</h1>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50 p-4">
-        <LoginForm />
+        {authView === "login" ? (
+          <LoginForm onRegisterClick={() => setAuthView("register")} />
+        ) : (
+          <RegisterForm onBackToLogin={() => setAuthView("login")} />
+        )}
       </div>
     );
   }
 
   return (
     <Shell
-      sidebar={
-        <div className="flex flex-col h-full overflow-hidden">
-          <PresenceBanner />
-          <div className="flex-1 min-h-0">
-            <Sidebar />
-          </div>
-          <div className="border-t border-slate-100 bg-white flex-shrink-0 p-2">
-            <WizardStepper />
-          </div>
-        </div>
-      }
+      sidebar={<Sidebar />}
       form={<WizardEngine />}
       preview={<PDFPreview />}
     />

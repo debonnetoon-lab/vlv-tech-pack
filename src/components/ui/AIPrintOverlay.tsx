@@ -8,11 +8,17 @@ interface Props {
 }
 
 export default function AIPrintOverlay({ measurement }: Props) {
-  const { pixel_box } = measurement;
+  if (!measurement || !measurement.pixel_box || !measurement.print) {
+    return null;
+  }
+
+  const { pixel_box, print } = measurement;
   
-  // We calculate percentages if we had the original image dimensions, 
-  // but since we are in a responsive container, we'll use the box as provided.
-  // In a real implementation, we'd map pixel_box to the current image container.
+  // Robustness check for incomplete data
+  if (typeof pixel_box.left_px === 'undefined' || typeof pixel_box.top_px === 'undefined' || 
+      typeof pixel_box.right_px === 'undefined' || typeof pixel_box.bottom_px === 'undefined') {
+    return null;
+  }
   
   // For the demonstration, we'll assume the base image is 1200x1200px (standardized).
   const left = (pixel_box.left_px / 1200) * 100;
@@ -32,7 +38,7 @@ export default function AIPrintOverlay({ measurement }: Props) {
         }}
       >
         <div className="bg-orange-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full -top-3 absolute shadow-lg uppercase tracking-tighter">
-          AI PRINT AREA ({measurement.width_cm} x {measurement.height_cm}cm)
+          AI PRINT AREA ({print.width_cm} x {print.height_cm}cm)
         </div>
         
         {/* Corner markers */}
@@ -47,7 +53,7 @@ export default function AIPrintOverlay({ measurement }: Props) {
         className="absolute w-2 h-2 bg-blue-500 rounded-full border border-white shadow-lg animate-pulse"
         style={{
           left: `50%`,
-          top: `${(pixel_box.top_px - (measurement.pos_under_neck_cm * (1200 / 54))) / 1200 * 100}%`,
+          top: `${(pixel_box.top_px - (print.pos_under_neck_cm * (1200 / 54))) / 1200 * 100}%`,
           transform: 'translateX(-50%)'
         }}
       >

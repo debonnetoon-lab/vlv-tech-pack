@@ -28,6 +28,7 @@ export const metadata: Metadata = {
 
 import { AppProviders } from "@/providers/AppProviders";
 import { PWARegistry } from "@/components/PWARegistry";
+import OfflineBanner from "@/components/ui/OfflineBanner";
 
 export default function RootLayout({
   children,
@@ -41,6 +42,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <AppProviders>
+          <OfflineBanner />
           {children}
         </AppProviders>
         <PWARegistry />

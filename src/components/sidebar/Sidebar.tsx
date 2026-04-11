@@ -1,226 +1,289 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import React from "react";
-import { Folder, FileText, Plus, Copy, Trash2, Settings, Download, ArrowDownAZ, GripVertical, WifiOff, ChevronRight, Check } from "lucide-react";
-import {  useUIStore, useDataStore, useCollaborationStore , useTechPackStore } from "@/store";
+import React, { useState } from "react";
+import { 
+  LayoutDashboard, 
+  FolderKanban, 
+  Package, 
+  Settings, 
+  ChevronLeft, 
+  Plus, 
+  Search,
+  LogOut,
+  ChevronRight,
+  Building
+} from "lucide-react";
+import { useTechPackStore, useUIStore, useDataStore } from "@/store";
 import { cn } from "@/lib/utils";
-import { useEffect, useState } from "react";
-import { Reorder, AnimatePresence, motion } from "framer-motion";
-import DataManagement from "../settings/DataManagement";
-import { PresenceBanner } from "../collaboration/PresenceBanner";
-import WizardStepper from "../wizard/WizardStepper";
+import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/lib/supabase";
 
 export default function Sidebar() {
-  const [isOnline, setIsOnline] = useState(true);
-
-  useEffect(() => {
-    setIsOnline(window.navigator.onLine);
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
   const { 
+    user, 
+    profile, 
+    organization,
     collections, 
-    activeCollectionId, 
-    activeArticleId,
-    activeStep,
     setActiveCollection,
     setActiveArticle,
-    setActiveStep,
-    addCollection,
-    addArticle,
-    profile,
-    user
+    activeCollectionId,
+    activeArticleId,
+    userRole
   } = useTechPackStore();
 
-  const { setSettingsOpen, isCollectionModalOpen, setCollectionModalOpen } = useUIStore();
-  const [newCollectionName, setNewCollectionName] = React.useState("");
+  const isViewer = userRole === 'viewer';
+  
+  const { setSettingsOpen, setCollectionModalOpen } = useUIStore();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState<"dashboard" | "collections" | "products" | "settings">("dashboard");
+  const [expandedCollections, setExpandedCollections] = useState<string[]>([]);
 
-  const activeCollection = collections.find((c: any) => c.id === activeCollectionId);
-  const activeArticle = activeCollection?.articles.find((a: any) => a.id === activeArticleId);
+  const navItems = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "collections", label: "Collecties", icon: FolderKanban },
+    { id: "settings", label: "Instellingen", icon: Settings },
+  ];
 
-  const handleCreateCollection = () => {
-    setCollectionModalOpen(true);
-  };
-
-  const submitNewCollection = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newCollectionName.trim()) {
-      addCollection(newCollectionName.trim());
-      setNewCollectionName("");
-      setCollectionModalOpen(false);
+  const handleNavClick = (id: string) => {
+    setActiveTab(id as any);
+    if (id === "dashboard") {
+      setActiveArticle(null);
+      setActiveCollection(null);
+      setSettingsOpen(false);
+    } else if (id === "settings") {
+      setSettingsOpen(true);
     }
   };
 
-  const handleCreateArticle = (colId: string) => {
-    addArticle(colId, { product_name: "Nieuw Artikel", reference_code: "" });
+  const toggleCollection = (colId: string) => {
+    setExpandedCollections(prev =>
+      prev.includes(colId) ? prev.filter(id => id !== colId) : [...prev, colId]
+    );
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.reload();
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0b1912] text-white/70 font-sans select-none border-r border-white/[0.05]">
-      {/* ── BRAND HEADER ── */}
-      <div className="p-4 flex items-center justify-between border-b border-white/[0.03] bg-white/[0.01]">
-        <div className="flex items-center gap-2.5">
-           <div className={cn(
-             "w-2.5 h-2.5 rounded-full shadow-[0_0_12px_rgba(34,201,129,0.5)]",
-             isOnline ? "bg-[#22c981]" : "bg-red-500"
-           )} />
-           <h1 className="font-black italic tracking-tighter text-sm text-white uppercase">VLV BUILDER</h1>
-        </div>
-        
-        <button 
-          onClick={handleCreateCollection}
-          className="w-7 h-7 rounded-lg bg-white/[0.07] border border-white/10 flex items-center justify-center text-[#22c981] hover:bg-white/10 hover:text-white transition-all transform active:scale-[0.98]"
-          title="Nieuwe Collectie"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* ── STATUS / PRESENCE (Punt 7) ── */}
-      <div className="px-2 border-b border-white/[0.03] bg-white/[0.01]">
-        <PresenceBanner />
-      </div>
-
-      {/* ── OVERZICHT (Dashboard) ── */}
-      <div className="p-3 border-b border-white/[0.03]">
-        <button
-          onClick={() => { setActiveArticle(null); setActiveCollection(null); setSettingsOpen(false); }}
-          className={cn(
-            "w-full flex items-center gap-3 p-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all",
-            !activeArticleId && !isSettingsOpen ? "bg-[#22c981] text-[#0b1912] shadow-md shadow-[#22c981]/20" : "text-white/40 hover:bg-white/5 hover:text-white"
-          )}
-        >
-          <GripVertical className="w-4 h-4" />
-          Dashboard
-        </button>
-      </div>
-
-      {/* ── COLLECTIONS SELECTOR ── */}
-      <div className="p-3 border-b border-white/[0.03]">
-         <div className="flex items-center justify-between mb-2 px-1">
-            <span className="text-[9px] font-black text-[#2d7a55] uppercase tracking-widest">Collecties</span>
-         </div>
-         <div className="space-y-1">
-            {collections.slice(0, 5).map((col: any) => (
-               <div key={col.id} className="space-y-1">
-                 <button 
-                    onClick={() => { setActiveCollection(col.id); setActiveArticle(col.articles?.[0]?.id || null); setActiveStep(1); }}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold transition-all",
-                      activeCollectionId === col.id ? "bg-[#22c981]/10 text-white border border-[#22c981]/20 shadow-md" : "hover:bg-white/5 text-slate-500"
-                    )}
-                 >
-                    <Folder className="w-3 h-3 text-[#22c981]" />
-                    <span className="truncate flex-1 text-left">{col.name}</span>
-                 </button>
-
-                 {/* Geneste lijst van artikelen als collectie open is */}
-                 {activeCollectionId === col.id && (
-                    <div className="pl-5 pr-1 py-2 space-y-1 mb-2 border-l-2 border-white/5 ml-3">
-                       {col.articles?.map((art: any) => (
-                          <button
-                            key={art.id}
-                            onClick={() => { setActiveArticle(art.id); setActiveStep(1); }}
-                            className={cn(
-                               "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[10px] font-bold transition-all group",
-                               activeArticleId === art.id ? "text-[#22c981] bg-[#22c981]/5 shadow-sm" : "text-slate-400 hover:text-white hover:bg-white/5"
-                            )}
-                          >
-                             <FileText className="w-3 h-3 opacity-50 group-hover:opacity-100" />
-                             <span className="truncate flex-1 text-left">{art.product_name || "Naamloos Item"}</span>
-                          </button>
-                       ))}
-                       <button
-                         onClick={() => { addArticle(col.id, { product_name: "Nieuw Artikel" }); setActiveStep(1); }}
-                         className="w-full flex items-center gap-2 px-3 py-2 mt-2 rounded-lg text-[10px] font-bold transition-all text-white/40 hover:text-[#22c981] hover:bg-[#22c981]/5 border border-dashed border-white/10 hover:border-[#22c981]/30"
-                       >
-                         <Plus className="w-3 h-3" />
-                         Tech Pack Toevoegen
-                       </button>
-                    </div>
-                 )}
-               </div>
-            ))}
-         </div>
-      </div>
-
-      {/* ── STAPPENPLAN (Punt 2, 3, 6) ── */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-0">
-        {activeArticle ? (
-           <WizardStepper />
-        ) : (
-           <div className="py-12 px-4 text-center space-y-4 opacity-40">
-              <div className="w-10 h-10 rounded-2xl bg-white/5 mx-auto flex items-center justify-center">
-                 <FileText className="w-5 h-5 text-slate-700" />
+    <motion.div 
+      initial={false}
+      animate={{ width: isCollapsed ? 80 : 280 }}
+      className="flex flex-col h-full bg-[#0b1912] text-white select-none border-r border-white/[0.05] transition-all duration-300 ease-in-out relative group overflow-hidden"
+    >
+      {/* ── LOGO & COLLAPSE ── */}
+      <div className="h-20 flex items-center px-6 justify-between border-b border-white/[0.03] shrink-0">
+        <AnimatePresence mode="wait">
+          {!isCollapsed && (
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              className="flex items-center gap-3"
+            >
+              <div className="w-8 h-8 rounded-xl bg-[#22c981] flex items-center justify-center shadow-[0_0_20px_rgba(34,201,129,0.3)]">
+                <span className="font-black italic text-black text-sm">V</span>
               </div>
-              <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed">
-                 Selecteer een artikel<br />om te navigeren
-              </p>
+              <h1 className="font-black italic tracking-tighter text-lg uppercase">VLV <span className="text-[#22c981]">V3</span></h1>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {isCollapsed && (
+           <div className="w-8 h-8 rounded-xl bg-[#22c981] flex items-center justify-center mx-auto shadow-[0_0_20px_rgba(34,201,129,0.3)]">
+             <span className="font-black italic text-black text-sm">V</span>
            </div>
         )}
-      </div>
 
-      {/* ── FOOTER / SETTINGS (Punt 13) ── */}
-      <div className="p-3 border-t border-white/[0.03] space-y-3 bg-[#0b1912]">
         <button 
-           onClick={() => setSettingsOpen(true)}
-           className="w-full flex items-center gap-3 p-3 rounded-2xl text-slate-500 hover:bg-white/[0.03] hover:text-white transition-all text-[10px] font-black uppercase tracking-widest"
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="absolute -right-3 top-8 w-6 h-6 rounded-full bg-[#22c981] text-[#0b1912] flex items-center justify-center shadow-lg transform transition-transform hover:scale-110 active:scale-95 z-50"
         >
-           <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center">
-              <Settings className="w-3.5 h-3.5" />
-           </div>
-           Instellingen & Back-up
+          <ChevronLeft className={cn("w-4 h-4 transition-transform duration-300", isCollapsed && "rotate-180")} />
         </button>
-
-        <div className="flex items-center gap-3 px-1 pt-1 opacity-80">
-          <div 
-            className="w-8 h-8 rounded-full flex items-center justify-center text-[#fff] font-black text-[10px] shadow-inner"
-            style={{ backgroundColor: profile?.avatar_color || "#1D9E75" }}
-          >
-            {profile?.initials || "U"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-black text-white/90 truncate uppercase tracking-tight">{profile?.full_name || "Toon Vive Le Vélo"}</p>
-            <p className="text-[9px] text-slate-500 truncate">{user?.email || "toon@vivelevelo.be"}</p>
-          </div>
-          <WifiOff className={cn("w-3 h-3 transition-colors", isOnline ? "text-slate-800" : "text-red-500")} />
-        </div>
       </div>
 
-      {/* Modals styles unchanged */}
-
-      {isCollectionModalOpen && (
-        <div className="fixed inset-0 z-50 bg-[#0b1912]/90 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setCollectionModalOpen(false)}>
-          <div className="w-full max-w-sm bg-white rounded-[40px] shadow-2xl p-10 space-y-6 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-             <div className="space-y-1">
-                <h3 className="text-2xl font-black italic tracking-tighter uppercase text-[#0b1912]">Nieuwe Collectie</h3>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">Geef je collectie een naam</p>
-             </div>
-             <form onSubmit={submitNewCollection} className="space-y-4">
-                <input 
-                   autoFocus
-                   type="text"
-                   className="w-full h-14 px-5 rounded-2xl border-2 border-slate-100 focus:border-[#22c981] focus:ring-0 transition-all font-black text-lg text-[#0b1912] placeholder:text-slate-200"
-                   placeholder="bv. SS2026 - Main"
-                   value={newCollectionName}
-                   onChange={(e) => setNewCollectionName(e.target.value)}
-                />
-                <div className="flex gap-2 pt-2">
-                   <button type="button" onClick={() => setCollectionModalOpen(false)} className="flex-1 h-14 rounded-2xl text-slate-400 font-bold hover:bg-slate-50 transition-colors uppercase text-[10px] tracking-widest">Annuleren</button>
-                   <button type="submit" disabled={!newCollectionName.trim()} className="flex-[2] h-14 rounded-2xl bg-[#0b1912] text-[#22c981] font-black hover:scale-[1.03] disabled:opacity-50 disabled:hover:scale-100 transition-all uppercase text-[10px] tracking-widest shadow-xl active:scale-[0.98]">Aanmaken</button>
-                </div>
-             </form>
+      {/* ── SEARCH ── */}
+      {!isCollapsed && (
+        <div className="px-4 py-4 shrink-0">
+          <div className="relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20 group-focus-within:text-[#22c981] transition-colors" />
+            <input 
+              type="text" 
+              placeholder="Zoeken..."
+              className="w-full bg-white/[0.03] border border-white/[0.05] rounded-xl py-2.5 pl-10 pr-4 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#22c981]/50 placeholder:text-white/10 transition-all"
+            />
           </div>
         </div>
       )}
-    </div>
+
+      {/* ── NAVIGATION ── */}
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-hide">
+        {navItems.map((item) => (
+          <div key={item.id}>
+            <button
+              onClick={() => handleNavClick(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 p-3 rounded-xl transition-all relative group",
+                activeTab === item.id 
+                  ? "bg-[#22c981] text-[#0b1912] font-black shadow-lg shadow-[#22c981]/10" 
+                  : "text-white/40 hover:bg-white/[0.03] hover:text-white"
+              )}
+            >
+              <item.icon className={cn("w-5 h-5 shrink-0", activeTab === item.id ? "text-[#0b1912]" : "text-[#22c981]/60 group-hover:text-[#22c981]")} />
+              {!isCollapsed && (
+                <span className="text-xs uppercase tracking-widest leading-none mt-0.5 flex-1 text-left">{item.label}</span>
+              )}
+              {/* Badge: collection count */}
+              {!isCollapsed && item.id === "collections" && collections.length > 0 && (
+                <span className={cn(
+                  "text-[9px] font-black px-1.5 py-0.5 rounded-full",
+                  activeTab === item.id ? "bg-[#0b1912]/20 text-[#0b1912]" : "bg-white/10 text-white/40"
+                )}>
+                  {collections.length}
+                </span>
+              )}
+            </button>
+
+            {/* ── COLLECTION LIST (only in collections tab) ── */}
+            {item.id === "collections" && activeTab === "collections" && !isCollapsed && (
+              <div className="mt-1 ml-3 space-y-0.5">
+                {collections.length === 0 ? (
+                  <p className="text-[10px] text-white/20 px-3 py-2 font-medium">Geen collecties</p>
+                ) : (
+                  collections.map((col: any) => (
+                    <div key={col.id}>
+                      <button
+                        onClick={() => {
+                          setActiveCollection(col.id);
+                          toggleCollection(col.id);
+                        }}
+                        className={cn(
+                          "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all",
+                          activeCollectionId === col.id
+                            ? "bg-white/10 text-white"
+                            : "text-white/30 hover:text-white/60 hover:bg-white/[0.03]"
+                        )}
+                      >
+                        <FolderKanban className="w-3.5 h-3.5 shrink-0 text-[#22c981]/40" />
+                        <span className="text-[11px] font-bold truncate flex-1">{col.name}</span>
+                        <ChevronRight className={cn(
+                          "w-3 h-3 shrink-0 transition-transform text-white/20",
+                          expandedCollections.includes(col.id) && "rotate-90"
+                        )} />
+                      </button>
+
+                      {/* Product sub-list */}
+                      {expandedCollections.includes(col.id) && col.products?.length > 0 && (
+                        <div className="ml-4 mt-0.5 space-y-0.5">
+                          {col.products.map((prod: any) => (
+                            <div key={prod.id} className="group/item relative">
+                              <button
+                                onClick={() => {
+                                  setActiveCollection(col.id);
+                                  setActiveArticle(prod.id);
+                                }}
+                                className={cn(
+                                  "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-all",
+                                  activeArticleId === prod.id
+                                    ? "bg-[#22c981]/10 text-[#22c981]"
+                                    : "text-white/20 hover:text-white/50 hover:bg-white/[0.03]"
+                                )}
+                              >
+                                <Package className="w-3 h-3 shrink-0" />
+                                <span className="text-[10px] font-medium truncate flex-1">{prod.name}</span>
+                              </button>
+                              
+                              {/* [NEW] Duplicate Action */}
+                              {!isViewer && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm(`Gooi dit artikel (${prod.name}) in de kopieermachine?`)) {
+                                      useDataStore.getState().duplicateProduct(col.id, prod.id);
+                                    }
+                                  }}
+                                  title="Dupliceer artikel"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 p-1 rounded-md bg-[#22c981]/10 text-[#22c981] hover:bg-[#22c981] hover:text-[#0b1912] transition-all"
+                                >
+                                  <Plus className="w-2.5 h-2.5 rotate-45" /> {/* Using Plus rotated for a 'cross' or duplicate feel, or I can use Copy if I import it */}
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+
+                {/* New Collection button */}
+                {!isViewer && (
+                  <button
+                    onClick={() => setCollectionModalOpen(true)}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-white/20 hover:text-[#22c981] hover:bg-[#22c981]/5 transition-all group mt-1"
+                  >
+                    <Plus className="w-3.5 h-3.5 shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Nieuwe Collectie</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </nav>
+
+      {/* ── ORGANIZATION & PROFILE ── */}
+      <div className="p-4 border-t border-white/[0.03] bg-white/[0.01] shrink-0">
+        {!isCollapsed && (
+          <div className="mb-4 px-2">
+            <div className="flex items-center gap-3 p-3 rounded-2xl bg-[#22c981]/5 border border-[#22c981]/10">
+              <div className="w-8 h-8 rounded-lg bg-[#22c981]/20 flex items-center justify-center shrink-0">
+                <Building className="w-4 h-4 text-[#22c981]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-black uppercase text-[#22c981] tracking-tighter">Workspace</p>
+                <p className="text-xs font-bold text-white truncate italic">{organization?.name || "VLV Studio"}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className={cn(
+          "flex items-center gap-3 px-2 w-full group cursor-pointer",
+          isCollapsed && "justify-center px-0"
+        )}>
+           <div 
+             className="w-10 h-10 rounded-xl flex items-center justify-center text-black font-black text-sm shadow-xl shrink-0 transform transition-transform group-hover:scale-105"
+             style={{ backgroundColor: (profile as any)?.avatar_color || "#22c981" }}
+           >
+             {(profile as any)?.initials || (profile?.full_name?.charAt(0) || "U")}
+           </div>
+           
+           {!isCollapsed && (
+             <div className="flex-1 min-w-0">
+               <p className="text-xs font-black text-white truncate uppercase tracking-tight">{profile?.full_name || "Fashion Designer"}</p>
+               <div className="flex items-center gap-1.5">
+                 <p className="text-[10px] text-white/30 truncate font-medium">{user?.email}</p>
+                 <span className="text-[8px] px-1 bg-white/10 text-white/40 rounded-sm uppercase font-bold tracking-tighter">{userRole}</span>
+               </div>
+             </div>
+           )}
+
+           {!isCollapsed && (
+             <button
+               onClick={handleLogout}
+               title="Uitloggen"
+               className="p-2 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-500/10 transition-all"
+             >
+               <LogOut className="w-3.5 h-3.5" />
+             </button>
+           )}
+        </div>
+      </div>
+    </motion.div>
   );
 }
+
+

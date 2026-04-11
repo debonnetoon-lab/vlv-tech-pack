@@ -2,8 +2,8 @@
 "use client";
 
 import React from "react";
-import { TechPackArticle, SizeMeasurement } from "@/types/tech-pack";
-import { useDataStore } from "@/store"
+import { TechPackProduct, SizeMeasurement } from "@/types/tech-pack";
+import { useTechPackStore } from "@/store"
 import { ClipboardList, Calculator, Info, CheckCircle2 } from "lucide-react";
 
 const SIZE_GAMMAS = {
@@ -14,19 +14,19 @@ const SIZE_GAMMAS = {
 };
 
 interface Props {
-  article: TechPackArticle;
+  article: TechPackProduct;
   collectionId: string;
 }
 
 export default function Step8Order({ article, collectionId }: Props) {
-  const updateArticle = useDataStore((state) => state.updateArticle);
+  const updateProduct = useTechPackStore((state) => state.updateProduct);
   
   const currentCategory = (article.gender as string) || "Unisex";
 
   const handleCategoryChange = (category: string) => {
     // When category changes, we should probably clear or adjust sizes
     // For now, we'll just update the gender/category
-    updateArticle(collectionId, article.id, {
+    updateProduct(collectionId, article.id, {
       gender: category.toLowerCase() as any,
       sizes: [] // Clear sizes when category changes to trigger fresh start
     });
@@ -45,7 +45,7 @@ export default function Step8Order({ article, collectionId }: Props) {
       newSizes = [...existingSizes, { size_label: sizeLabel, order_quantity: num }];
     }
 
-    updateArticle(collectionId, article.id, { sizes: newSizes });
+    updateProduct(collectionId, article.id, { sizes: newSizes });
   };
 
   const totalQuantity = (article.sizes || []).reduce((acc, s) => acc + (s.order_quantity || 0), 0);

@@ -2,740 +2,409 @@
 "use client";
 
 import React from "react";
-import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer";
-import { TechPackArticle } from "@/types/tech-pack";
+import { Document, Page, Text, View, StyleSheet, Image, Canvas } from "@react-pdf/renderer";
+import { TechPackProduct, SizeMeasurement } from "@/types/tech-pack";
+import { PDF_STRINGS } from "@/lib/pdf-strings";
 
 const styles = StyleSheet.create({
-  page: {
-    padding: 40,
-    fontSize: 9,
-    fontFamily: "Helvetica",
-    color: "#0F172A",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    borderBottomWidth: 2,
-    borderBottomColor: "#000",
-    paddingBottom: 20,
-    marginBottom: 30,
-  },
-  companyName: {
-    fontSize: 14,
-    fontWeight: "bold",
-    letterSpacing: 1.5,
-  },
-  companyDetail: {
-    fontSize: 7,
-    color: "#64748B",
-    marginTop: 2,
-  },
-  titleBlock: {
-    marginBottom: 25,
-  },
-  articleCode: {
-    fontSize: 32,
-    fontWeight: "bold",
-    marginBottom: 4,
-  },
-  productName: {
-    fontSize: 14,
-    color: "#64748B",
-    textTransform: "uppercase",
-    letterSpacing: 2,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 8,
-    fontWeight: "bold",
-    color: "#64748B",
-    textTransform: "uppercase",
-    letterSpacing: 2,
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-    paddingBottom: 4,
-  },
-  visualGrid: {
-    flexDirection: "row",
-    gap: 20,
-    marginBottom: 25,
-  },
-  visualItem: {
-    flex: 1,
-    height: 220,
-    backgroundColor: "#F8FAFC",
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  table: {
-    width: "100%",
-  },
-  tableHeader: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#000",
-    paddingBottom: 6,
-    marginBottom: 6,
-  },
-  tableRow: {
-    flexDirection: "row",
-    paddingVertical: 6,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#F1F5F9",
-  },
-  col1: { width: "10%" }, // Druk Nr
-  col2: { width: "20%" }, // Positie
-  col3: { width: "20%" }, // Afmeting
-  col4: { width: "18%" }, // Techniek
-  col5: { width: "17%" }, // Referentie
-  col6: { width: "15%" }, // Kleuren
-  label: { fontSize: 7, fontWeight: "bold", color: "#64748B", textTransform: "uppercase" },
-  value: { fontSize: 9, marginTop: 2 },
-  colorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 6,
-    width: "33%",
-  },
-  colorSwatch: {
-    width: 22,
-    height: 22,
-    marginRight: 8,
-  },
-  footer: {
-    position: "absolute",
-    bottom: 40,
-    left: 40,
-    right: 40,
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-    paddingTop: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    fontSize: 7,
-    color: "#94A3B8",
-  },
-  sizingGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 5,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 4,
-  },
-  sizingCell: {
-    width: "16.66%",
-    padding: 6,
-    borderRightWidth: 1,
-    borderRightColor: "#E2E8F0",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-    alignItems: "center",
-  },
-  sizingLabel: {
-    fontSize: 6,
-    fontWeight: "bold",
-    color: "#64748B",
-    marginBottom: 2,
-  },
-  sizingValue: {
-    fontSize: 9,
-    fontWeight: "bold",
-  },
-  sizingTotal: {
-    backgroundColor: "#0F172A",
-    color: "#fff",
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 4,
-    marginTop: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  // Phase 2: 3-Column Placement Layout
-  placementPage: {
-    padding: 30,
-    fontSize: 8,
-    fontFamily: "Helvetica",
-  },
-  placementGrid: {
-    flexDirection: "row",
-    gap: 15,
-    marginTop: 20,
-    minHeight: 400,
-  },
-  placementCol: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: "#FDFDFD",
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
-    borderRadius: 8,
-  },
-  placementColWide: {
-    flex: 1.5,
-  },
-  specItem: {
-    marginBottom: 12,
-  },
-  specLabel: {
-    fontSize: 6,
-    fontWeight: "black",
-    color: "#64748B",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginBottom: 2,
-  },
-  specValue: {
-    fontSize: 9,
-    fontWeight: "bold",
-    color: "#0F172A",
-  },
-  specValueSecondary: {
-    fontSize: 7,
-    color: "#475569",
-    marginTop: 1,
-  },
-  colorBubble: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 4,
-    backgroundColor: "#F8FAFC",
-    borderRadius: 4,
-    marginBottom: 4,
-  },
-  disclaimerBlock: {
-    marginTop: 'auto',
-    padding: 12,
-    backgroundColor: "#F8FAFC",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderLeftWidth: 4,
-    borderLeftColor: "#0F172A",
-  },
-  disclaimerText: {
-    fontSize: 7,
-    color: "#475569",
-    lineHeight: 1.5,
-    fontStyle: "italic",
-    textAlign: "justify",
-  },
-  // Phase 3: Tables
-  specTable: {
-    width: "100%",
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  specTableHeader: {
-    flexDirection: "row",
-    backgroundColor: "#F8FAFC",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-  },
-  specTableRow: {
-    flexDirection: "row",
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#F1F5F9",
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-  },
-  specHeaderCell: {
-    fontSize: 6,
-    fontWeight: "black",
-    color: "#64748B",
-    textTransform: "uppercase",
-  },
-  specCell: {
-    fontSize: 7,
-    color: "#0F172A",
-  }
+  page: { padding: 40, fontFamily: "Helvetica", fontSize: 9, color: "#0F172A", backgroundColor: "#FFFFFF" },
+  
+  // Header
+  header: { flexDirection: "row", justifyContent: "space-between", marginBottom: 30, paddingBottom: 15, borderBottomWidth: 2, borderBottomColor: "#000" },
+  brandTitle: { fontSize: 18, fontWeight: 900, textTransform: "uppercase", letterSpacing: 1 },
+  headerRight: { textAlign: "right" },
+  headerText: { fontSize: 7, color: "#475569", marginBottom: 2 },
+  
+  // Title Block
+  titleBlock: { marginBottom: 20 },
+  articleCode: { fontSize: 32, fontWeight: 900, color: "#0F172A", letterSpacing: -1 },
+  klantPo: { fontSize: 9, fontWeight: 900, textTransform: "uppercase", marginTop: 4 },
+  productName: { fontSize: 13, color: "#64748B", textTransform: "uppercase", marginTop: 4, letterSpacing: 0.5 },
+
+  // Sections
+  sectionLabel: { fontSize: 9, fontWeight: 900, textTransform: "uppercase", letterSpacing: 2, color: "#94A3B8", marginBottom: 10 },
+  
+  // Visuals Grid Page 1
+  visualsGrid: { flexDirection: "row", gap: 15, marginBottom: 20 },
+  visualBox: { flex: 1, height: 260, backgroundColor: "#F8FAFC", justifyContent: "center", alignItems: "center", padding: 10 },
+  artworkBox: { flex: 1, height: 260, backgroundColor: "#FFFFFF", border: "1px dashed #CBD5E1", justifyContent: "center", alignItems: "center", padding: 10, position: "relative" },
+  artworkSpecBottom: { position: "absolute", bottom: 10, left: 10 },
+  artworkSpecTitle: { fontSize: 8, fontWeight: 900 },
+  artworkSpecDesc: { fontSize: 7, color: "#64748B" },
+
+  // Mat Block & Color Block
+  infoRow: { flexDirection: "row", gap: 20, marginBottom: 20 },
+  infoBox: { flex: 1, backgroundColor: "#F8FAFC", padding: 15, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  infoLabel: { fontSize: 7, fontWeight: 900, textTransform: "uppercase" },
+  infoValue: { fontSize: 11, fontWeight: 900, marginTop: 2 },
+  infoSub: { fontSize: 8, color: "#64748B", marginTop: 2 },
+
+  // Tables
+  table: { width: "100%", marginBottom: 20 },
+  trHead: { flexDirection: "row", borderBottom: "1.5px solid #CBD5E1", paddingBottom: 8, marginBottom: 8 },
+  th: { fontSize: 7, fontWeight: 900, color: "#64748B", textTransform: "uppercase" },
+  tr: { flexDirection: "row", borderBottom: "1px solid #E2E8F0", paddingVertical: 10, alignItems: "center" },
+  tdBase: { fontSize: 8, color: "#0F172A", paddingRight: 4 },
+  tdBold: { fontSize: 8, fontWeight: 900, color: "#0F172A" },
+  tdSub: { fontSize: 7, color: "#64748B" },
+
+  // Labels & Verpakking
+  labelsBox: { backgroundColor: "#F8FAFC", padding: 15, flexDirection: "row", gap: 40, marginBottom: 20 },
+
+  // Order Quantities
+  orderBox: { marginBottom: 20 },
+  orderHeader: { flexDirection: "row" },
+  orderRow: { flexDirection: "row", border: "1px solid #E2E8F0" },
+  orderCellHead: { flex: 1, paddingVertical: 8, textAlign: "center", fontSize: 7, fontWeight: 900, borderRight: "1px solid #E2E8F0", borderBottom: "1px solid #E2E8F0" },
+  orderCell: { flex: 1, paddingVertical: 10, textAlign: "center", fontSize: 10, fontWeight: 900, borderRight: "1px solid #E2E8F0" },
+  totalRow: { backgroundColor: "#0F172A", flexDirection: "row", justifyContent: "space-between", padding: 12, alignItems: "center", borderRadius: 4, marginTop: 5 },
+  totalLabel: { color: "#FFFFFF", fontSize: 10, fontWeight: 900, textTransform: "uppercase" },
+  totalValue: { color: "#FFFFFF", fontSize: 12, fontWeight: 900 },
+
+  // Waarschuwing
+  warningBox: { backgroundColor: "#FEF2F2", borderLeft: "4px solid #EF4444", padding: 15, marginBottom: 30 },
+  warningTitle: { color: "#EF4444", fontSize: 9, fontWeight: 900, textTransform: "uppercase", marginBottom: 4 },
+  warningText: { color: "#EF4444", fontSize: 8 },
+
+  // Smaller visuals repeat
+  visualMiniRow: { flexDirection: "row", gap: 10, height: 140 },
+
+  // P3 Layout
+  badgeRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 },
+  badge: { backgroundColor: "#0F172A", color: "#FFFFFF", paddingVertical: 6, paddingHorizontal: 15, borderRadius: 4, fontSize: 12, fontWeight: 900 },
+  badgePos: { fontSize: 14, fontWeight: 900, color: "#0F172A", marginLeft: 15 },
+  
+  col3Layout: { flexDirection: "row", gap: 15, flex: 1 },
+  p3Col: { flex: 1, backgroundColor: "#F8FAFC", borderRadius: 8, padding: 15 },
+  p3BoxDashed: { flex: 1, border: "1px dashed #CBD5E1", backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center", marginBottom: 10 },
+  yellowNote: { backgroundColor: "#FEF08A", padding: 8, borderRadius: 4, textAlign: "center" },
+  listProp: { marginBottom: 15 },
+  listLabel: { fontSize: 7, fontWeight: 900, textTransform: "uppercase", color: "#64748B", marginBottom: 2 },
+  listValue: { fontSize: 11, fontWeight: 900, color: "#0F172A" },
+  listSub: { fontSize: 8, color: "#64748B", marginTop: 1 },
+  grayMetricBox: { backgroundColor: "#F1F5F9", padding: 10, borderRadius: 4, marginTop: 10 },
+  
+  disclaimerBox: { borderWidth: 1, borderColor: "#E2E8F0", borderLeftWidth: 4, borderLeftColor: "#0F172A", padding: 15, borderRadius: 4, marginTop: 20 },
+  
+  // Footer Standard
+  footer: { position: "absolute", bottom: 20, left: 40, right: 40, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  footerText: { fontSize: 7, color: "#94A3B8" }
 });
 
-interface Props {
-  article: TechPackArticle;
-  collectionName: string;
-}
-
-const stripEmoji = (text: string = "") => {
-  if (!text) return "";
-  return text.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E6}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1F3FB}-\u{1F3FF}\u{200D}\u{200B}\u{FE0F}]/gu, '').trim();
-};
-
-const COMPANY_INFO = {
-  name: "VIVE LE VELO",
-  address: "Kasteelstraat 2 - bus 1, 8600 Diksmuide",
-  vat: "BE0723453021"
-};
-
-const DEFAULT_DISCLAIMER = "Door ondertekening van dit document geeft u akkoord op de bovenstaande specificaties. Kleine afwijkingen in kleur (± 5% Pantone) en maatvoering (± 0.5cm) zijn inherent aan het productieproces en worden aanvaard.";
-
-// Helper to prevent React-PDF from crashing on undefined, null, or boolean
-const safeText = (val: any, fallback = "") => {
-  if (val === null || val === undefined) return fallback;
-  if (typeof val === "boolean") return val ? "Ja" : "Nee";
+const safeText = (val: any, fallback = "-") => {
+  if (val === null || val === undefined || val === "") return fallback;
   return String(val);
 };
 
-export const TechPackPages = ({ article, collectionName }: Props) => {
-  const renderVisuals = (isRepeat: boolean) => (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{isRepeat ? `Visual Reference (Repeat: ${safeText(article.reference_code, "N/A")})` : "Visuals & Artwork"}</Text>
-      <View style={styles.visualGrid}>
-        {["front", "back", "artwork"].map((viewType) => {
-           const visuals = article.images || (article as any).article_images || [];
-           // Fallback support for 'design' in case the database uses that instead of 'artwork'
-           const visual = visuals.find((v: any) => v.view === viewType || (viewType === 'artwork' && v.view === 'design'));
-           
-           if (!visual?.public_url && viewType === "artwork") return null;
-
-           return (
-             <View key={viewType} style={[styles.visualItem, viewType === "artwork" ? { border: "2px dashed #CBD5E1", backgroundColor: "#fff" } : {}, isRepeat ? { height: 180 } : {}]}>
-                {visual?.public_url ? (
-                  <View style={{ width: "100%", height: "100%", padding: 10 }}>
-                    <Image src={visual.public_url} style={{ width: "100%", height: "80%", objectFit: "contain" }} />
-                    {!isRepeat && viewType === "artwork" && (
-                       <View style={{ marginTop: 10, borderTop: "1px solid #F1F5F9", paddingTop: 5 }}>
-                          <Text style={{ fontSize: 7, fontWeight: "bold" }}>ARTWORK SPEC</Text>
-                          {article.placements?.[0]?.technique && <Text style={{ fontSize: 6, color: "#64748B" }}>Tech: {stripEmoji(safeText(article.placements[0].technique))}</Text>}
-                       </View>
-                    )}
-                  </View>
-                ) : (
-                  <Text style={{ color: "#CBD5E1", fontSize: 8 }}>{viewType === 'back' ? 'BACK' : viewType.toUpperCase()} VISUAL</Text>
-                )}
-             </View>
-           );
-        })}
-      </View>
+const Header = ({ title, date, orgName, collectionName, pageIndex, totalPages }: any) => (
+  <View style={styles.header} fixed>
+    <View>
+      <Text style={styles.brandTitle}>{orgName}</Text>
+      <Text style={[styles.headerText, { marginTop: 4 }]}>VLV PRODUCTION HUB</Text>
+      <Text style={styles.headerText}>Ref: Tech-Pack-v2</Text>
     </View>
+    <View style={styles.headerRight}>
+      <Text style={styles.headerText}>{title} - {PDF_STRINGS.page.toUpperCase()} {pageIndex}/{totalPages}</Text>
+      <Text style={styles.headerText}>{date}</Text>
+      <Text style={styles.headerText}>{PDF_STRINGS.collection}</Text>
+      <Text style={[styles.headerText, { fontWeight: 900, color: "#0F172A" }]}>{collectionName}</Text>
+    </View>
+  </View>
+);
+
+const Footer = ({ pageIndex, totalPages }: any) => (
+  <View style={styles.footer} fixed>
+    <Text style={styles.footerText}>© {new Date().getFullYear()} VIVE LE VELO - {PDF_STRINGS.confidential}</Text>
+    <Text style={styles.footerText}>{PDF_STRINGS.page} {pageIndex} {PDF_STRINGS.of} {totalPages}</Text>
+  </View>
+);
+
+const Watermark = ({ isApproved }: { isApproved: boolean }) => (
+  <Canvas
+    style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 }}
+    paint={(ctx, width, height) => {
+      ctx.save();
+      ctx.translate(width / 2, height / 2);
+      ctx.rotate(-45 * Math.PI / 180);
+      ctx.opacity(0.1);
+      ctx.fontSize(120);
+      ctx.fillColor(isApproved ? "#22C55E" : "#EF4444");
+      
+      const label = isApproved ? PDF_STRINGS.approved : PDF_STRINGS.draft;
+      for (let i = -2; i <= 2; i++) {
+        ctx.fillText(label, -200, i * 150);
+      }
+      ctx.restore();
+    }}
+  />
+);
+
+export const TechPackPages = ({ article, organization, collectionName }: any) => {
+  const images = article.images || [];
+  const colorways = article.colorways || [];
+  const placements = (article as any).artwork_placements || article.placements || [];
+  const materials = (article as any).materials || [];
+  const pomPoints = (article as any).measurement_points || [];
+  
+  const date = new Date().toLocaleDateString('en-GB'); 
+  const orgName = organization?.name || "VIVE LE VELO";
+  const isApproved = article.status === 'approved';
+  
+  const sizeGamma = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"].filter(s => 
+    article.sizes?.some((sz: any) => sz.size_label === s)
   );
 
-  const renderBOM = () => {
-    const items = article.bom_items || [];
-    if (items.length === 0) return null;
-
-    return (
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Bill of Materials (BOM)</Text>
-        <View style={styles.specTable}>
-           <View style={styles.specTableHeader}>
-              <Text style={[styles.specHeaderCell, { width: "15%" }]}>Cat.</Text>
-              <Text style={[styles.specHeaderCell, { width: "35%" }]}>Omschrijving</Text>
-              <Text style={[styles.specHeaderCell, { width: "20%" }]}>Spec</Text>
-              <Text style={[styles.specHeaderCell, { width: "15%" }]}>Leverancier</Text>
-              <Text style={[styles.specHeaderCell, { width: "15%", textAlign: "right" }]}>Hvh / Eenheid</Text>
-           </View>
-           {items.map((item, i) => (
-             <View key={i} style={styles.specTableRow}>
-                <Text style={[styles.specCell, { width: "15%" }]}>{safeText(item.category)}</Text>
-                <Text style={[styles.specCell, { width: "35%", fontWeight: "bold" }]}>{safeText(item.description)}</Text>
-                <Text style={[styles.specCell, { width: "20%" }]}>{safeText(item.specification)}</Text>
-                <Text style={[styles.specCell, { width: "15%" }]}>{safeText(item.supplier)}</Text>
-                <Text style={[styles.specCell, { width: "15%", textAlign: "right" }]}>{item.quantity} {item.unit}</Text>
-             </View>
-           ))}
-        </View>
-      </View>
-    );
-  };
-
-  const renderMeasurementSpecs = () => {
-    const points = article.measurement_points || [];
-    if (points.length === 0) return null;
-
-    // Determine sizes to show based on the first point or article gender
-    const SIZE_GAMMAS = {
-      "unisex": ["3XS", "XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"],
-      "women": ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL"],
-      "kids": ["3-4j", "5-6j", "7-8j", "9-11j", "12-14j"],
-      "baby": ["0/6m", "6/12m", "12/18m", "18/24m", "2/3j"]
-    };
-    const activeSizes = SIZE_GAMMAS[article.gender as keyof typeof SIZE_GAMMAS] || SIZE_GAMMAS["unisex"];
-    const colWidth = 70 / activeSizes.length + "%";
-
-    return (
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Size Specifications (CM)</Text>
-        <View style={styles.specTable}>
-           <View style={styles.specTableHeader}>
-              <Text style={[styles.specHeaderCell, { width: "20%" }]}>P.O.M.</Text>
-              <Text style={[styles.specHeaderCell, { width: "10%" }]}>Tol.</Text>
-              {activeSizes.map(s => (
-                <Text key={s} style={[styles.specHeaderCell, { width: colWidth, textAlign: "center", color: "#22c981" }]}>{s}</Text>
-              ))}
-           </View>
-           {points.map((p, i) => (
-             <View key={i} style={styles.specTableRow}>
-                <Text style={[styles.specCell, { width: "20%", fontWeight: "bold" }]}>{safeText(p.label)}</Text>
-                <Text style={[styles.specCell, { width: "10%", fontSize: 6 }]}>{safeText(p.tolerance)}</Text>
-                {activeSizes.map(s => {
-                   const val = p.values?.find(v => v.size_label === s);
-                   return <Text key={s} style={[styles.specCell, { width: colWidth, textAlign: "center" }]}>{val?.value_cm || "-"}</Text>;
-                })}
-             </View>
-           ))}
-        </View>
-      </View>
-    );
-  };
-
-  const renderPlacementSpecPage = (p: any, index: number, total: number) => (
-    <Page key={index} size="A4" style={[styles.page, { padding: 35 }]}>
-       <View style={[styles.header, { marginBottom: 15, paddingBottom: 10 }]}>
-         <View>
-           <Text style={styles.companyName}>{COMPANY_INFO.name}</Text>
-           <Text style={[styles.label, { fontSize: 8, color: "#0F172A" }]}>DRUK SPECIFICATIE - PAGINA {index + 3}/{total + 2}</Text>
-         </View>
-         <View style={{ textAlign: "right" }}>
-           <Text style={{ fontSize: 10, fontWeight: "bold" }}>{safeText(article.reference_code, "CODE-TBA")}</Text>
-           <Text style={{ fontSize: 8, color: "#64748B" }}>{safeText(article.product_name)}</Text>
-         </View>
-       </View>
-
-       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-             <View style={{ backgroundColor: "#0F172A", padding: "6 12", borderRadius: 6 }}>
-                <Text style={{ color: "#fff", fontSize: 14, fontWeight: "black" }}>DRUK {safeText(p.print_order_number, String(index + 1))}</Text>
-             </View>
-             <Text style={{ fontSize: 16, fontWeight: "black", textTransform: "uppercase" }}>{safeText(p.placement_name)}</Text>
-          </View>
-          <View style={{ textAlign: "right" }}>
-             <Text style={styles.label}>KLANT PO</Text>
-             <Text style={{ fontSize: 10, fontWeight: "bold" }}>{safeText(article.customer_po, "N/A")}</Text>
-          </View>
-       </View>
-
-       <View style={styles.placementGrid}>
-          {/* Kolom 1: Visual / Mockup */}
-          <View style={[styles.placementCol, styles.placementColWide]}>
-             <Text style={styles.sectionTitle}>Mockup indicator</Text>
-             <View style={{ flex: 1, backgroundColor: "#fff", alignItems: "center", justifyContent: "center", border: "1px dashed #E2E8F0" }}>
-                {p.artwork_url ? (
-                  <Image src={p.artwork_url} style={{ width: "95%", height: "95%", objectFit: "contain" }} />
-                ) : (
-                  <Text style={{ color: "#CBD5E1", fontSize: 8 }}>GEEN ARTWORK UPLOADED</Text>
-                )}
-             </View>
-             <View style={{ marginTop: 10, padding: 8, backgroundColor: "#FEF9C3", borderRadius: 4 }}>
-                <Text style={{ fontSize: 7, fontWeight: "bold", color: "#854D0E" }}>INFO: Afmetingen op deze visual zijn indicatief.</Text>
-             </View>
-          </View>
-
-          {/* Kolom 2: Productie / Techniek */}
-          <View style={styles.placementCol}>
-             <Text style={styles.sectionTitle}>Productie Specs</Text>
-             
-             <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Techniek</Text>
-                <Text style={styles.specValue}>{stripEmoji(safeText(p.technique, "Bedrukken"))}</Text>
-                {p.technique_subtype ? <Text style={styles.specValueSecondary}>{safeText(p.technique_subtype)}</Text> : null}
-             </View>
-
-             <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Applicatie</Text>
-                <Text style={styles.specValue}>{stripEmoji(safeText(p.application_method, "N/A"))}</Text>
-             </View>
-
-             <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Drukkleuren</Text>
-                <View style={{ marginTop: 4 }}>
-                   {p.color_ids?.map((cid: string, ci: number) => {
-                      const color = article.colors?.find(c => c.id === cid || ci.toString() === cid);
-                      return (
-                         <View key={ci} style={styles.colorBubble}>
-                            <View style={{ width: 12, height: 12, backgroundColor: color?.hex_value || "#000", marginRight: 6, borderRadius: 2 }} />
-                            <Text style={{ fontSize: 7, fontWeight: "bold" }}>{color?.color_name || "Code: " + cid}</Text>
-                         </View>
-                      );
-                   })}
-                   {(!p.color_ids || p.color_ids.length === 0) && <Text style={{ fontSize: 7, color: "#94A3B8" }}>Geen specifieke kleuren</Text>}
-                </View>
-             </View>
-          </View>
-
-          {/* Kolom 3: Positionering */}
-          <View style={styles.placementCol}>
-             <Text style={styles.sectionTitle}>Positionering</Text>
-             
-             <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Afmeting (W x H)</Text>
-                <Text style={{ fontSize: 12, fontWeight: "bold" }}>{safeText(p.width_cm, "0")} x {safeText(p.height_cm, "0")} cm</Text>
-                <Text style={styles.specValueSecondary}>Surface: {(((Number(p.width_cm) || 0) * (Number(p.height_cm) || 0)) || 0).toFixed(1)} cm²</Text>
-             </View>
-
-             <View style={styles.specItem}>
-                <Text style={styles.specLabel}>Tolerantie</Text>
-                <Text style={styles.specValue}>± {safeText(p.tolerance_cm, "0.5")} cm</Text>
-             </View>
-
-             <View style={[styles.specItem, { marginTop: 10, padding: 8, backgroundColor: "#F1F5F9", borderRadius: 6 }]}>
-                <Text style={styles.specLabel}>Afstand vanaf naad</Text>
-                <Text style={{ fontSize: 13, fontWeight: "black", color: "#0F172A" }}>{safeText(p.reference_distance, "0")} CM</Text>
-                <Text style={[styles.specValueSecondary, { fontWeight: "bold", color: "#0F172A", textTransform: "uppercase" }]}>vanaf {safeText(p.reference_point, "Halsnaad")}</Text>
-             </View>
-
-             {p.notes && (
-                <View style={{ marginTop: 10 }}>
-                   <Text style={styles.specLabel}>Instructies</Text>
-                   <Text style={{ fontSize: 7, lineHeight: 1.3 }}>{p.notes}</Text>
-                </View>
-             )}
-          </View>
-       </View>
-
-       {/* Disclaimer Footer */}
-       {article.disclaimer_enabled !== false && (
-          <View style={styles.disclaimerBlock}>
-             <Text style={{ fontSize: 7, fontWeight: "bold", marginBottom: 3 }}>PRODUCTIE DISCLAIMER</Text>
-             <Text style={styles.disclaimerText}>
-                {article.disclaimer_text || DEFAULT_DISCLAIMER}
-             </Text>
-          </View>
-       )}
-
-       {/* Visual Reference (Optional Small Visual) */}
-       <View style={{ marginTop: 20, flexDirection: "row", gap: 10 }}>
-          {["front", "back"].map(view => {
-             const img = article.images?.find(v => v.view === view);
-             if (!img) return null;
-             return (
-                <View key={view} style={{ width: 80, height: 80, backgroundColor: "#fff", border: "1px solid #F1F5F9", borderRadius: 4, padding: 5 }}>
-                   <Image src={img.public_url} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-                   <Text style={{ fontSize: 5, color: "#CBD5E1", textAlign: "center", marginTop: 2 }}>{view.toUpperCase()}</Text>
-                </View>
-             );
-          })}
-       </View>
-
-       <View style={styles.footer}>
-         <View style={{ flexDirection: "column", gap: 2 }}>
-           <Text>© {new Date().getFullYear()} VIVE LE VELO - CONFIDENTIAL</Text>
-         </View>
-         <Text style={{ textAlign: "right" }}>Pagina {index + 3} van {total + 2}</Text>
-       </View>
-    </Page>
-  );
+  const totalQuantity = (article.sizes || []).reduce((acc: number, s: SizeMeasurement) => acc + (s.order_quantity || 0), 0);
 
   return (
     <>
+      {/* PAGE 1: VISUALS & IDENTITY */}
       <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.companyName}>{COMPANY_INFO.name}</Text>
-            <Text style={styles.companyDetail}>{COMPANY_INFO.address}</Text>
-            <Text style={styles.companyDetail}>BTW: {COMPANY_INFO.vat}</Text>
-          </View>
-          <View style={{ textAlign: "right" }}>
-            <Text style={styles.label}>Technische Fiche - PAGINA 1/2</Text>
-            <Text style={styles.value}>{new Date().toLocaleDateString()}</Text>
-            <Text style={[styles.label, { marginTop: 4 }]}>Collectie</Text>
-            <Text style={styles.value}>{safeText(collectionName)}</Text>
-          </View>
-        </View>
-
+        <Watermark isApproved={isApproved} />
+        <Header title={PDF_STRINGS.documentTitle} date={date} orgName={orgName} collectionName={collectionName || "VLV Collection"} pageIndex={1} totalPages={3} />
+        
         <View style={styles.titleBlock}>
-          <Text style={styles.articleCode}>{safeText(article.reference_code, "CODE-TBA")}</Text>
-          {article.customer_po ? <Text style={[styles.label, { fontSize: 10, marginBottom: 8, color: "#0F172A" }]}>KLANT PO: {safeText(article.customer_po)}</Text> : null}
-          <Text style={styles.productName}>{safeText(article.product_name)}</Text>
+          <Text style={styles.articleCode}>{safeText(article.article_code, "REF-TBA")}</Text>
+          <Text style={styles.klantPo}>{PDF_STRINGS.klantPo}: {safeText(article.customer_po, "/////")}</Text>
+          <Text style={styles.productName}>{safeText(article.name)}</Text>
         </View>
 
-        {renderVisuals(false)}
-
-        {(article.fabric_main || article.fabric_secondary) && (
-          <View style={[styles.section, { marginTop: -15, marginBottom: 25, padding: 10, backgroundColor: "#F8FAFC", borderRadius: 4, borderLeftWidth: 3, borderLeftColor: "#0F172A" }]}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <View>
-                <Text style={[styles.label, { color: "#0F172A", marginBottom: 2 }]}>BASIS MATERIAAL / ONDERGROND</Text>
-                <Text style={{ fontSize: 11, fontWeight: "bold" }}>{safeText(article.fabric_main, "Niet gespecificeerd")}</Text>
-                {article.fabric_secondary ? <Text style={{ fontSize: 8, color: "#475569", marginTop: 2 }}>Extra: {safeText(article.fabric_secondary)}</Text> : null}
-              </View>
-              {article.weight_gsm ? (
-                <View style={{ textAlign: "right" }}>
-                  <Text style={[styles.label, { color: "#0F172A", marginBottom: 2 }]}>GEWICHT</Text>
-                  <Text style={{ fontSize: 11, fontWeight: "bold" }}>{safeText(article.weight_gsm)} GSM</Text>
-                </View>
-              ) : null}
-            </View>
-          </View>
-        )}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Color Specification</Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-             {article.colors?.map((c, i) => (
-               <View key={i} style={styles.colorRow}>
-                 <View style={[styles.colorSwatch, { backgroundColor: c.hex_value }]} />
-                 <View>
-                    <Text style={{ fontWeight: "bold" }}>{safeText(c.color_name, "Onbekende kleur")}</Text>
-                    <Text style={[styles.label, { textTransform: "none" }]}>{safeText(c.pantone_code, "Geen code")}</Text>
-                 </View>
-               </View>
-             ))}
-          </View>
-        </View>
-
-        <View style={styles.footer}>
-          <View style={{ flexDirection: "column", gap: 2 }}>
-            <Text>© {new Date().getFullYear()} VIVE LE VELO - CONFIDENTIAL</Text>
-            <Text>Concept & Uitwerking door TOON DEBONNE - Alle rechten voorbehouden.</Text>
-          </View>
-          <Text style={{ textAlign: "right" }}>Pagina 1 van {(article.placements?.length || 0) + 2}</Text>
-        </View>
-      </Page>
-
-      <Page size="A4" style={styles.page}>
-        <View style={[styles.header, { marginBottom: 20 }]}>
-          <View>
-            <Text style={styles.companyName}>{COMPANY_INFO.name}</Text>
-            <Text style={styles.label}>Technische Fiche - PAGINA 2/2</Text>
-          </View>
-          <View style={{ textAlign: "right" }}>
-            <Text style={{ fontSize: 10, fontWeight: "bold" }}>{safeText(article.reference_code, "CODE-TBA")}</Text>
-            <Text style={{ fontSize: 8, color: "#64748B" }}>{safeText(article.product_name)}</Text>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Specifications & Placements</Text>
-          <View style={styles.table}>
-            <View style={styles.tableHeader}>
-               <Text style={[styles.col1, styles.label]}>Nr</Text>
-               <Text style={[styles.col2, styles.label]}>Positie</Text>
-               <Text style={[styles.col3, styles.label]}>Afmeting</Text>
-               <Text style={[styles.col4, styles.label]}>Techniek</Text>
-               <Text style={[styles.col5, styles.label]}>Referentie</Text>
-               <Text style={[styles.col6, styles.label]}>Kleuren</Text>
-            </View>
-            {article.placements?.map((p, i) => (
-              <View key={i} style={styles.tableRow}>
-                <Text style={styles.col1}>{safeText(p.print_order_number, String(i + 1))}</Text>
-                <Text style={styles.col2}>{safeText(p.placement_name)}</Text>
-                <Text style={styles.col3}>
-                  {safeText(p.width_cm)} x {safeText(p.height_cm)} cm{"\n"}
-                  <Text style={{ fontSize: 7, color: "#64748B" }}>± {safeText(p.tolerance_cm, "0.5")} cm</Text>
-                </Text>
-                <Text style={styles.col4}>
-                  {safeText(p.technique)}{"\n"}
-                  <Text style={{ fontSize: 6, color: "#64748B" }}>{safeText(p.technique_subtype, "")}{p.application_method ? ` (${safeText(p.application_method)})` : ""}</Text>
-                </Text>
-                <Text style={styles.col5}>
-                  {safeText(p.reference_distance, "0")} cm{"\n"}
-                  <Text style={{ fontSize: 6, color: "#64748B" }}>vanaf {safeText(p.reference_point, "Halsnaad")}</Text>
-                </Text>
-                <View style={[styles.col6, { flexDirection: "row", flexWrap: "wrap", gap: 2 }]}>
-                   {p.color_ids?.map((cid, ci) => {
-                     const color = article.colors?.find(c => c.id === cid || ci.toString() === cid);
-                     return (
-                        <View key={ci} style={{ width: 8, height: 8, backgroundColor: color?.hex_value || "#000", border: "0.5px solid #E2E8F0" }} />
-                     );
-                   })}
-                   {(!p.color_ids || p.color_ids.length === 0) && <Text style={{ fontSize: 6, color: "#CBD5E1" }}>N/A</Text>}
-                </View>
-              </View>
-            ))}
-            {(article.label_type || article.packaging) && (
-               <View style={{ marginTop: 15, padding: 12, backgroundColor: "#F8FAFC", borderRadius: 6, borderWidth: 1, borderColor: "#E2E8F0" }}>
-                  <Text style={{ fontSize: 8, fontWeight: "black", marginBottom: 8, color: "#0F172A", textTransform: "uppercase", letterSpacing: 1 }}>LABELS & VERPAKKING</Text>
-                  <View style={{ flexDirection: "row", gap: 20 }}>
-                    {article.label_type ? (
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.label, { fontSize: 6, marginBottom: 2 }]}>LABELLING</Text>
-                        <Text style={{ fontSize: 8, fontWeight: "bold" }}>{safeText(article.label_type)}</Text>
-                        <Text style={{ fontSize: 7, color: "#64748B" }}>Positie: {safeText(article.label_position)}</Text>
-                        {article.label_content ? <Text style={{ fontSize: 7, color: "#64748B", marginTop: 2 }}>Inhoud: {safeText(article.label_content)}</Text> : null}
-                      </View>
-                    ) : null}
-                    {(article.packaging && article.packaging !== "none") ? (
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.label, { fontSize: 6, marginBottom: 2 }]}>VERPAKKING</Text>
-                        <Text style={{ fontSize: 8, fontWeight: "bold" }}>{safeText(article.packaging)}</Text>
-                        <Text style={{ fontSize: 7, color: "#64748B" }}>{safeText(article.packaging_notes, "Standaard verpakking")}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-               </View>
+        <Text style={styles.sectionLabel}>{PDF_STRINGS.visualRef}</Text>
+        <View style={styles.visualsGrid}>
+          <View style={styles.visualBox}>
+            {images.find((img: any) => img.view === 'front')?.public_url && (
+              <Image src={images.find((img: any) => img.view === 'front').public_url} style={{ width: "90%", height: "90%", objectFit: "contain" }} />
             )}
           </View>
+          <View style={styles.visualBox}>
+            {images.find((img: any) => img.view === 'back')?.public_url && (
+              <Image src={images.find((img: any) => img.view === 'back').public_url} style={{ width: "90%", height: "90%", objectFit: "contain" }} />
+            )}
+          </View>
+          <View style={styles.artworkBox}>
+            {images.find((img: any) => img.view === 'artwork')?.public_url && (
+              <Image src={images.find((img: any) => img.view === 'artwork').public_url} style={{ width: "90%", height: "90%", objectFit: "contain" }} />
+            )}
+            <View style={styles.artworkSpecBottom}>
+              <Text style={styles.artworkSpecTitle}>SKETCH / REF</Text>
+              <Text style={styles.artworkSpecDesc}>{PDF_STRINGS.garmentType}: {safeText(article.garment_type, "Standard")}</Text>
+            </View>
+          </View>
         </View>
 
-        {renderSizingTable()}
-
-        {article.description && typeof article.description === 'string' && article.description.trim() !== "" && (
-          <View style={[styles.section, { backgroundColor: "#FEF2F2", padding: 15, borderLeft: "4px solid #EF4444" }]}>
-             <Text style={{ fontSize: 9, fontWeight: "bold", color: "#B91C1C", marginBottom: 6 }}>OPMERKINGEN / BELANGRIJK</Text>
-             <Text style={{ fontSize: 8, color: "#DC2626", lineHeight: 1.4 }}>
-               {article.description}
-             </Text>
+        <View style={styles.infoRow}>
+          <View style={styles.infoBox}>
+            <View>
+              <Text style={styles.infoLabel}>{PDF_STRINGS.fabricMain}</Text>
+              <Text style={styles.infoValue}>{safeText(article.fabric_main || materials[0]?.name, "100% Cotton")}</Text>
+              <Text style={styles.infoSub}>{safeText(article.fabric_secondary || materials[1]?.name, "N/A")}</Text>
+            </View>
+            <View style={{ textAlign: "right" }}>
+              <Text style={styles.infoLabel}>{PDF_STRINGS.gsmWeight}</Text>
+              <Text style={styles.infoValue}>{safeText(article.weight_gsm || materials[0]?.weight_gsm, "155")} GSM</Text>
+            </View>
           </View>
+        </View>
+
+        <Text style={styles.sectionLabel}>{PDF_STRINGS.colorSpec}</Text>
+        <View style={{ flexDirection: "row", gap: 15, flexWrap: "wrap" }}>
+          {colorways.length > 0 ? colorways.map((c: any, i: number) => (
+            <View key={i} style={{ flexDirection: "row", gap: 10, alignItems: "center", marginBottom: 5 }}>
+              <View style={{ width: 30, height: 30, backgroundColor: c.hex_code || "#CBD5E1" }} />
+              <View>
+                <Text style={styles.tdBold}>{safeText(c.name)}</Text>
+                <Text style={styles.tdSub}>{safeText(c.pantone_code, "CMYK")}</Text>
+              </View>
+            </View>
+          )) : (
+            <Text style={styles.tdSub}>No specific colorways defined.</Text>
+          )}
+        </View>
+
+        <Footer pageIndex={1} totalPages={3} />
+      </Page>
+
+      {/* PAGE 2: TECHNICAL TABLES & POM */}
+      <Page size="A4" style={styles.page}>
+        <Watermark isApproved={isApproved} />
+        <Header title={PDF_STRINGS.specificationsTitle} date={date} orgName={orgName} collectionName={collectionName} pageIndex={2} totalPages={3} />
+
+        <Text style={styles.sectionLabel}>{PDF_STRINGS.materialsTitle}</Text>
+        <View style={styles.table}>
+          <View style={styles.trHead}>
+            <Text style={[styles.th, { width: "30%" }]}>{PDF_STRINGS.matName}</Text>
+            <Text style={[styles.th, { width: "25%" }]}>{PDF_STRINGS.matComp}</Text>
+            <Text style={[styles.th, { width: "10%" }]}>{PDF_STRINGS.matWeight}</Text>
+            <Text style={[styles.th, { width: "35%" }]}>{PDF_STRINGS.matSupplier}</Text>
+          </View>
+          {materials.length > 0 ? materials.map((m: any, i: number) => (
+            <View key={i} style={styles.tr}>
+              <Text style={[styles.tdBold, { width: "30%" }]}>{safeText(m.name)}</Text>
+              <Text style={[styles.tdBase, { width: "25%" }]}>{safeText(m.composition)}</Text>
+              <Text style={[styles.tdBase, { width: "10%" }]}>{m.weight_gsm || "-"} g</Text>
+              <Text style={[styles.tdSub, { width: "35%" }]}>{safeText(m.supplier_article_code, "Standard")}</Text>
+            </View>
+          )) : (
+            <Text style={styles.tdSub}>No materials specified.</Text>
+          )}
+        </View>
+
+        <Text style={styles.sectionLabel}>{PDF_STRINGS.sizeSpecsTitle}</Text>
+        <View style={styles.table}>
+          <View style={styles.trHead}>
+             <Text style={[styles.th, { width: "40%" }]}>{PDF_STRINGS.pomLabel}</Text>
+             <Text style={[styles.th, { width: "10%" }]}>{PDF_STRINGS.toleranceLabel}</Text>
+             {sizeGamma.map(size => (
+                <Text key={size} style={[styles.th, { flex: 1, textAlign: "center" }]}>{size}</Text>
+             ))}
+          </View>
+          {pomPoints.length > 0 ? pomPoints.map((p: any, i: number) => (
+             <View key={i} style={styles.tr}>
+                <Text style={[styles.tdBold, { width: "40%" }]}>{safeText(p.point_of_measurement)}</Text>
+                <Text style={[styles.tdSub, { width: "10%" }]}>{PDF_STRINGS.approx} {p.tolerance_cm || 0.5}</Text>
+                {sizeGamma.map(size => (
+                   <Text key={size} style={[styles.tdBase, { flex: 1, textAlign: "center", fontWeight: size === "M" ? 900 : 400 }]}>
+                      {p.measurements?.[size] || "-"}
+                   </Text>
+                ))}
+             </View>
+          )) : (
+             <Text style={styles.tdSub}>No measurement points configured.</Text>
+          )}
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 20 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.sectionLabel}>{PDF_STRINGS.orderQtyTitle}</Text>
+            <View style={styles.orderBox}>
+              <View style={styles.orderRow}>
+                {sizeGamma.map(size => (
+                  <Text key={size} style={styles.orderCellHead}>{size}</Text>
+                ))}
+              </View>
+              <View style={styles.orderRow}>
+                {sizeGamma.map(size => (
+                  <Text key={size} style={styles.orderCell}>
+                    {article.sizes?.find((s: any) => s.size_label === size)?.order_quantity || 0}
+                  </Text>
+                ))}
+              </View>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>{PDF_STRINGS.totalOrderLabel}</Text>
+                <Text style={styles.totalValue}>{totalQuantity} {PDF_STRINGS.units}</Text>
+              </View>
+            </View>
+          </View>
+          
+          <View style={{ width: "30%" }}>
+            <Text style={styles.sectionLabel}>{PDF_STRINGS.labelsTitle}</Text>
+            <View style={[styles.p3Col, { backgroundColor: "#F1F5F9" }]}>
+               <Text style={styles.listLabel}>{PDF_STRINGS.labelling}</Text>
+               <Text style={styles.tdBold}>{safeText(article.label_type, "Printed")}</Text>
+               <Text style={styles.listLabel}>{PDF_STRINGS.packaging}</Text>
+               <Text style={styles.tdBold}>{safeText(article.packaging, "Polybag")}</Text>
+            </View>
+          </View>
+        </View>
+
+        <Footer pageIndex={2} totalPages={3} />
+      </Page>
+
+      {/* PAGE 3: ARTWORK & PLACEMENTS */}
+      <Page size="A4" style={styles.page}>
+        <Watermark isApproved={isApproved} />
+        <Header title={PDF_STRINGS.printSpecTitle} date={date} orgName={orgName} collectionName={collectionName} pageIndex={3} totalPages={3} />
+
+        {placements.length > 0 ? placements.slice(0, 2).map((p: any, idx: number) => (
+          <View key={idx} style={{ marginBottom: 25 }}>
+            <View style={styles.badgeRow}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={styles.badge}>PRINT {idx + 1}</Text>
+                <Text style={styles.badgePos}>{safeText(p.placement_name).toUpperCase()}</Text>
+              </View>
+              <Text style={[styles.headerText, { fontWeight: 900 }]}>{PDF_STRINGS.klantPo}: {safeText(article.customer_po, "/////")}</Text>
+            </View>
+
+            <View style={styles.col3Layout}>
+              <View style={styles.p3Col}>
+                <Text style={styles.sectionLabel}>{PDF_STRINGS.mockupIndicator}</Text>
+                <View style={styles.p3BoxDashed}>
+                  {images.find((img: any) => img.view === 'artwork')?.public_url ? (
+                     <Image src={images.find((img: any) => img.view === 'artwork').public_url} style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                  ) : (
+                     <Text style={{ fontSize: 8, color: "#CBD5E1", fontWeight: 900 }}>NO ARTWORK</Text>
+                  )}
+                </View>
+                <View style={styles.yellowNote}>
+                  <Text style={{ fontSize: 7, fontWeight: 900, color: "#854D0E" }}>{PDF_STRINGS.infoDisclaimer}</Text>
+                </View>
+              </View>
+              
+              <View style={styles.p3Col}>
+                <Text style={styles.sectionLabel}>{PDF_STRINGS.productionSpecs}</Text>
+                <View style={styles.listProp}>
+                  <Text style={styles.listLabel}>{PDF_STRINGS.technique}</Text>
+                  <Text style={styles.listValue}>{safeText(p.technique, "Screenprint")}</Text>
+                  <Text style={styles.listSub}>{safeText(p.technique_subtype, "Standard")}</Text>
+                </View>
+                <View style={styles.listProp}>
+                  <Text style={styles.listLabel}>{PDF_STRINGS.application}</Text>
+                  <Text style={styles.listValue}>{safeText(p.application_method, "Heatpress")}</Text>
+                </View>
+                <View style={styles.listProp}>
+                  <Text style={styles.listLabel}>{PDF_STRINGS.printColors}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 4, backgroundColor: "#FFFFFF", padding: 6, borderRadius: 4 }}>
+                    <View style={{ width: 14, height: 14, backgroundColor: "#000000" }} />
+                    <Text style={{ fontSize: 8, fontWeight: 900 }}>Standard</Text>
+                  </View>
+                </View>
+              </View>
+              
+              <View style={styles.p3Col}>
+                <Text style={styles.sectionLabel}>{PDF_STRINGS.positioning}</Text>
+                <View style={styles.listProp}>
+                  <Text style={styles.listLabel}>{PDF_STRINGS.dimWidthHeight}</Text>
+                  <Text style={styles.listValue}>{p.width_cm} x {p.height_cm} cm</Text>
+                </View>
+                <View style={styles.listProp}>
+                  <Text style={styles.listLabel}>{PDF_STRINGS.tolerance}</Text>
+                  <Text style={styles.listValue}>{PDF_STRINGS.approx} {p.tolerance_cm || 0.5} cm</Text>
+                </View>
+                <View style={styles.grayMetricBox}>
+                  <Text style={[styles.listLabel, { fontSize: 6 }]}>{PDF_STRINGS.distFromSeam}</Text>
+                  <Text style={[styles.listValue, { fontSize: 13, marginVertical: 2 }]}>{p.reference_distance || 6.5} CM</Text>
+                  <Text style={[styles.listLabel, { fontSize: 7, color: "#0F172A" }]}>{PDF_STRINGS.from.toUpperCase()} {PDF_STRINGS.fromNape.toUpperCase()}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )) : (
+          <Text style={styles.tdSub}>No placements configured for this article.</Text>
         )}
 
-        <View style={{ marginTop: "auto" }}>
-           {renderVisuals(true)}
+        <View style={styles.disclaimerBox}>
+          <Text style={[styles.sectionLabel, { color: "#0F172A", marginBottom: 4 }]}>{PDF_STRINGS.productionDisclaimerTitle}</Text>
+          <Text style={{ fontSize: 7, color: "#475569", lineHeight: 1.5 }}>
+            {PDF_STRINGS.productionDisclaimerText}
+          </Text>
         </View>
 
-        <View style={styles.footer}>
-          <View style={{ flexDirection: "column", gap: 2 }}>
-            <Text>© {new Date().getFullYear()} VIVE LE VELO - CONFIDENTIAL</Text>
-            <Text>Concept & Uitwerking door TOON DEBONNE - Alle rechten voorbehouden.</Text>
-          </View>
-          <Text style={{ textAlign: "right" }}>Pagina 2 van {(article.placements?.length || 0) + 3}</Text>
-        </View>
+        <Footer pageIndex={3} totalPages={3} />
       </Page>
-
-      {/* NEW Page 3: BOM & Technical Specs */}
-      <Page size="A4" style={styles.page}>
-        <View style={[styles.header, { marginBottom: 20 }]}>
-          <View>
-            <Text style={styles.companyName}>{COMPANY_INFO.name}</Text>
-            <Text style={styles.label}>Technische Fiche - PAGINA 3/3</Text>
-          </View>
-          <View style={{ textAlign: "right" }}>
-            <Text style={{ fontSize: 10, fontWeight: "bold" }}>{safeText(article.reference_code, "CODE-TBA")}</Text>
-            <Text style={{ fontSize: 8, color: "#64748B" }}>{safeText(article.product_name)}</Text>
-          </View>
-        </View>
-
-        {renderBOM()}
-        {renderMeasurementSpecs()}
-
-        <View style={styles.footer}>
-          <View style={{ flexDirection: "column", gap: 2 }}>
-            <Text>© {new Date().getFullYear()} VIVE LE VELO - CONFIDENTIAL</Text>
-          </View>
-          <Text style={{ textAlign: "right" }}>Pagina 3 van {(article.placements?.length || 0) + 3}</Text>
-        </View>
-      </Page>
-
-      {/* NEW: Per-Placement Production Pages */}
-      {article.placements?.map((p, index) => 
-        renderPlacementSpecPage(p, index + 1, article.placements?.length || 0)
-      )}
     </>
   );
 };
 
-export const TechPackDocument = (props: Props) => (
+export const TechPackDocument = (props: any) => (
   <Document>
     <TechPackPages {...props} />
   </Document>
 );
 
-export const BulkTechPackDocument = ({ articles, collectionName }: { articles: TechPackArticle[], collectionName: string }) => (
+export const BulkTechPackDocument = ({ articles, ...props }: any) => (
   <Document>
-    {articles.map((article) => (
-      <TechPackPages key={article.id} article={article} collectionName={collectionName} />
+    {articles.map((article: any) => (
+      <TechPackPages key={article.id} article={article} {...props} />
     ))}
   </Document>
 );

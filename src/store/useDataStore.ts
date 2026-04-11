@@ -5,11 +5,10 @@ import { supabase } from "@/lib/supabase";
 
 import { useUIStore } from "./useUIStore";
 import { useCollaborationStore } from "./useCollaborationStore";
-import { TechPackArticle, Collection, ArticleImage } from "@/types/tech-pack";
+import { TechPackProduct, Collection, ProductImage } from "@/types/tech-pack";
 import { PresenceUser } from "@/types/collaboration";
 
 // Helper to debounce async functions
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function debounceAsync<T extends (...args: any[]) => Promise<any>>(
   fn: T,
   ms: number
@@ -36,32 +35,34 @@ const idbStorage: StateStorage = {
 };
 
 export const assetStorage = {
-  get: async (id: string): Promise<string | undefined> => {
-    return await get(`asset:${id}`);
-  },
-  set: async (id: string, data: string): Promise<void> => {
-    await set(`asset:${id}`, data);
-  },
-  remove: async (id: string): Promise<void> => {
-    await del(`asset:${id}`);
-  },
+  get: async (id: string) => await get(`asset:${id}`),
+  set: async (id: string, data: string) => await set(`asset:${id}`, data),
+  del: async (id: string) => await del(`asset:${id}`)
 };
 
 interface DataStore {
   collections: Collection[];
   organizationId: string | null;
+  organization: any | null;
+  activityLogs: any[];
   isSaving: boolean;
+  userRole: 'owner' | 'admin' | 'designer' | 'viewer' | null;
   
+  repairOrganization: () => Promise<void>;
+  fetchOrganization: () => Promise<void>;
   fetchCollections: () => Promise<void>;
+  fetchActivityLogs: () => Promise<void>;
+  createShare: (productId: string) => Promise<string | null>;
+  logExport: (productId: string, format: string) => Promise<void>;
+  logActivity: (action: string, entityType: string, entityId: string, metadata?: any) => Promise<void>;
   addCollection: (name: string, details?: Partial<Collection>) => Promise<void>;
-  addArticle: (collectionId: string, article: Partial<TechPackArticle>) => Promise<void>;
-  updateArticle: (collectionId: string, articleId: string, updates: Partial<TechPackArticle>) => Promise<void>;
-  removeArticle: (collectionId: string, articleId: string) => Promise<void>;
+  addProduct: (collectionId: string, product: Partial<TechPackProduct>) => Promise<void>;
+  updateProduct: (collectionId: string, productId: string, updates: Partial<TechPackProduct>) => Promise<void>;
+  removeProduct: (collectionId: string, productId: string) => Promise<void>;
   removeCollection: (collectionId: string) => Promise<void>;
-  duplicateArticle: (collectionId: string, articleId: string) => Promise<void>;
-  reorderArticles: (collectionId: string, articles: TechPackArticle[]) => void;
-  sortArticlesByName: (collectionId: string) => void;
-  uploadArticleImage: (articleId: string, file: File, view: ArticleImage['view']) => Promise<string>;
+  duplicateProduct: (collectionId: string, productId: string) => Promise<void>;
+  uploadProgress: number;
+  uploadProductImage: (productId: string, file: File, view: ProductImage['view']) => Promise<string>;
 }
 
 export const useDataStore = create<DataStore>()(
@@ -69,123 +70,270 @@ export const useDataStore = create<DataStore>()(
     (set, getData) => ({
       collections: [],
       organizationId: null,
+      organization: null,
+      activityLogs: [],
       isSaving: false,
+      userRole: null,
+      uploadProgress: 0,
+
+      fetchOrganization: async () => {
+        const { organizationId } = getData();
+        if (!organizationId) return;
+        const { data } = await supabase.from('organizations').select('*').eq('id', organizationId).single();
+        if (data) set({ organization: data });
+      },
+
+      logActivity: async (action, entityType, entityId, metadata) => {
+        const { organizationId } = getData();
+        const user = useCollaborationStore.getState().user;
+        if (!organizationId || !user) return;
+
+        await supabase.from('activity_logs').insert([{
+          organization_id: organizationId,
+          user_id: user.id,
+          action,
+          entity_type: entityType,
+          entity_id: entityId,
+          metadata
+        }]);
+      },
+
+      repairOrganization: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        set({ isSaving: true });
+        try {
+          // 1. Create Organization
+          const orgName = `${user.email?.split('@')[0] || 'My'} Workspace`;
+          const { data: org, error: orgErr } = await supabase
+            .from('organizations')
+            .insert([{ 
+              name: orgName, 
+              slug: `${orgName.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substring(2, 7)}` 
+            }])
+            .select()
+            .single();
+
+          if (orgErr || !org) throw new Error("Failed to create organization: " + orgErr?.message);
+
+          // 2. Add as member
+          const { error: memErr } = await supabase
+            .from('organization_members')
+            .insert([{ 
+              organization_id: org.id, 
+              user_id: user.id, 
+              role: 'owner' 
+            }]);
+
+          if (memErr) throw new Error("Failed to create membership: " + memErr.message);
+
+          set({ organizationId: org.id, organization: org });
+          await getData().fetchCollections();
+        } catch (err: any) {
+          console.error("Repair failed:", err);
+          alert("Reparatie mislukt: " + err.message);
+        } finally {
+          set({ isSaving: false });
+        }
+      },
 
       fetchCollections: async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Sync local collaboration state
+        // ── STEP 1: Ensure org exists ──
+        let orgId = getData().organizationId;
+        
+        if (!orgId) {
+          const { data, error: rpcError } = await supabase.rpc('ensure_user_organization');
+          if (!rpcError && data) {
+            orgId = data;
+          } else {
+            // Fallback: Check organization_members
+            const { data: mem } = await supabase
+              .from('organization_members')
+              .select('organization_id')
+              .eq('user_id', user.id)
+              .limit(1)
+              .single();
+            if (mem) orgId = mem.organization_id;
+          }
+        }
+
+        if (orgId) {
+          set({ organizationId: orgId });
+          // Also fetch the full organization object
+          const { data: org } = await supabase.from('organizations').select('*').eq('id', orgId).single();
+          if (org) set({ organization: org });
+
+          // [NEW] Fetch user role for this org
+          const { data: mem } = await supabase
+            .from('organization_members')
+            .select('role')
+            .eq('organization_id', orgId)
+            .eq('user_id', user.id)
+            .single();
+          
+          if (mem) set({ userRole: mem.role as any });
+        }
+
+        // ── STEP 2: Load profile into collaboration store ──
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
-        
+
         if (profileData) {
           useCollaborationStore.getState().setUser(user);
-          // Omit email error in strictly typed interfaces for now until types are cleaned up
-          useCollaborationStore.getState().setProfile({ 
-            ...profileData, 
-            email: user.email 
-          } as unknown as PresenceUser);
+          useCollaborationStore.getState().setProfile({ ...profileData, email: user.email } as unknown as PresenceUser);
         }
 
-        // Fetch User's Organization
-        const { data: orgMember } = await supabase
-          .from('organization_members')
-          .select('organization_id')
-          .eq('user_id', user.id)
-          .limit(1)
-          .single();
-        
-        if (orgMember) {
-          set({ organizationId: orgMember.organization_id });
-        } else {
-          // If no organization exists (e.g. existing user before migration), 
-          // we might need to create one, but let's try to fetch collections first.
-        }
-
-        const { data, error } = await supabase
+        // ── STEP 3: Fetch collections ──
+        let { data, error } = await supabase
           .from('collections')
           .select(`
             *,
-            articles (
+            products!collection_id (
               *,
-              sizes (*),
-              artwork_placements (*),
-              pantone_colors (*),
-              article_images (*),
               bom_items (*),
-              measurement_points (*, measurement_values (*))
+              materials (*),
+              colorways (*),
+              size_charts (*),
+              measurement_points (*, values:measurement_values(*)),
+              tech_pack_sections (*),
+              images:product_files (*)
             )
           `)
           .order('created_at', { ascending: false });
 
+        // Fallback if the complex join fails (e.g. missing tables)
+        if (error) {
+          console.warn("Complex fetch failed, falling back to simple fetch:", error.message);
+          const simpleFetch = await supabase
+            .from('collections')
+            .select('*, products!collection_id(*)')
+            .order('created_at', { ascending: false });
+          
+          data = simpleFetch.data;
+          error = simpleFetch.error;
+        }
+
         if (error) {
           console.error("Error fetching collections:", error);
         } else {
-          // Bridge database names to frontend property names
           const mappedCollections = (data as any[] || []).map(col => ({
             ...col,
-            articles: (col.articles || []).map((art: any) => ({
-              ...art,
-              images: art.article_images || [],
-              placements: art.artwork_placements || [],
-              colors: art.pantone_colors || [],
-              sizes: art.sizes || [],
-              bom_items: art.bom_items || [],
-              measurement_points: (art.measurement_points || []).map((mp: any) => ({
-                ...mp,
-                values: mp.measurement_values || []
-              }))
-            }))
+            products: (col.products || []).map((prod: any) => {
+              // Extract placements from tech_pack_sections
+              const sketchesSection = prod.tech_pack_sections?.find((s: any) => s.section_type === 'sketches');
+              const placements = sketchesSection?.data?.placements || [];
+
+              return {
+                ...prod,
+                materials: prod.materials || [],
+                colorways: prod.colorways || [],
+                size_charts: prod.size_charts || [],
+                bom_items: prod.bom_items || [],
+                images: prod.images || [],
+                placements: placements,
+                measurement_points: prod.measurement_points || []
+              };
+            })
           })) as unknown as Collection[];
 
           set({ collections: mappedCollections });
-          
+
           const uiStore = useUIStore.getState();
           if (!uiStore.activeCollectionId && mappedCollections.length > 0) {
             uiStore.setActiveCollection(mappedCollections[0].id);
-            const firstColArticles = mappedCollections[0].articles;
-            uiStore.setActiveArticle(firstColArticles?.[0]?.id || null);
           }
         }
       },
 
+      fetchActivityLogs: async () => {
+        const { organizationId } = getData();
+        if (!organizationId) return;
+
+        const { data, error } = await supabase
+          .from('activity_logs')
+          .select(`
+            *,
+            profiles (full_name, avatar_url)
+          `)
+          .eq('organization_id', organizationId)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (!error && data) {
+          set({ activityLogs: data });
+        }
+      },
+
+      createShare: async (productId: string) => {
+        const { organizationId } = getData();
+        if (!organizationId) return null;
+
+        const { data, error } = await supabase
+          .from('shares')
+          .insert([{ 
+            organization_id: organizationId, 
+            product_id: productId 
+          }])
+          .select()
+          .single();
+
+        if (error) {
+          console.error("Error creating share:", error);
+          return null;
+        }
+
+        return data.token;
+      },
+
+      logExport: async (productId: string, format: string) => {
+        const { organizationId, logActivity } = getData();
+        if (!organizationId) return;
+
+        await supabase.from('export_logs').insert([{
+          organization_id: organizationId,
+          product_id: productId,
+          format
+        }]);
+
+        await logActivity('exported', 'product', productId, { format });
+      },
+
       addCollection: async (name: string, details?: Partial<Collection>) => {
-        const { organizationId, fetchCollections } = getData();
+        const { organizationId, logActivity } = getData();
         let orgId = organizationId;
 
-        // Fallback: If no organizationId is set, user might be a legacy user
-        // We try to fetch or create one here for safety.
+        // Ensure we have an organization ID
         if (!orgId) {
           const { data: { user } } = await supabase.auth.getUser();
-          if (!user) return;
+          if (!user) {
+            alert("Sessie verlopen. Log opnieuw in.");
+            return;
+          }
           
+          // Fallback check if store is out of sync
           const { data: orgMember } = await supabase
             .from('organization_members')
             .select('organization_id')
             .eq('user_id', user.id)
             .limit(1)
             .single();
-          
-          if (orgMember) {
-            orgId = orgMember.organization_id;
-            set({ organizationId: orgId });
-          } else {
-             // Create a fallback organization for legacy users
-             const { data: newOrg } = await supabase.from('organizations').insert([{ name: 'Personal Workspace' }]).select().single();
-             if (newOrg) {
-               await supabase.from('organization_members').insert([{ organization_id: newOrg.id, user_id: user.id, role: 'owner' }]);
-               orgId = newOrg.id;
-               set({ organizationId: orgId });
-             }
+            
+          if (orgMember) { 
+            orgId = orgMember.organization_id; 
+            set({ organizationId: orgId }); 
           }
         }
 
         if (!orgId) {
-          console.error("No organization available.");
+          console.error("No organization found for user.");
+          alert("Geen actieve werkruimte gevonden. Neem contact op met support of voer de herstel-SQL uit.");
           return;
         }
 
@@ -196,36 +344,34 @@ export const useDataStore = create<DataStore>()(
             name, 
             organization_id: orgId,
             season: details?.season || "",
-            year: details?.year || new Date().getFullYear(),
-            description: details?.description || ""
+            year: details?.year || new Date().getFullYear()
           }])
           .select()
           .single();
 
         set({ isSaving: false });
-        if (error) console.error("Error adding collection:", error);
-        else {
-          set((state) => ({
-            collections: [
-              { ...data, articles: [] },
-              ...state.collections
-            ],
-          }));
-          useUIStore.getState().setActiveCollection(data.id);
+        if (error) {
+          console.error("Error creating collection:", error);
+          alert("Fout bij het aanmaken van collectie: " + error.message);
+        } else if (data) {
+          set((state) => ({ collections: [{ ...data, products: [] }, ...state.collections] }));
+          logActivity('created', 'collection', data.id, { name });
         }
       },
 
-      addArticle: async (collectionId: string, article: Partial<TechPackArticle>) => {
+      addProduct: async (collectionId: string, product: Partial<TechPackProduct>) => {
+        const { organizationId, logActivity } = getData();
         const user = useCollaborationStore.getState().user;
-        if (!user) return;
+        if (!user || !organizationId) return;
 
         set({ isSaving: true });
         const { data, error } = await supabase
-          .from('articles')
+          .from('products')
           .insert([{ 
             collection_id: collectionId, 
-            product_name: article.product_name || "Nieuw Artikel",
-            reference_code: article.reference_code || "",
+            organization_id: organizationId,
+            name: product.name || "Nieuw Product",
+            article_code: product.article_code || "",
             status: "draft",
             created_by: user.id
           }])
@@ -233,42 +379,26 @@ export const useDataStore = create<DataStore>()(
           .single();
 
         set({ isSaving: false });
-        if (error) {
-          console.error("Error adding article:", error);
-          return;
-        }
-
-        set((state) => {
-          const newArticle = {
-            ...data,
-            sizes: [],
-            placements: [],
-            colors: [],
-            images: [],
-          } as TechPackArticle;
-
-          return {
+        if (!error && data) {
+          set((state) => ({
             collections: state.collections.map((col) =>
-              col.id === collectionId 
-                ? { ...col, articles: [newArticle, ...col.articles] }
-                : col
+              col.id === collectionId ? { ...col, products: [data, ...col.products] } : col
             ),
-          };
-        });
-        
-        const uiStore = useUIStore.getState();
-        uiStore.setActiveArticle(data.id);
+          }));
+          logActivity('created', 'product', data.id, { name: data.name });
+          useUIStore.getState().setActiveArticle(data.id);
+        }
       },
 
-      updateArticle: async (collectionId: string, articleId: string, updates: Partial<TechPackArticle>) => {
-        // Optimistic UI
+      updateProduct: async (collectionId: string, productId: string, updates: Partial<TechPackProduct>) => {
+        const { logActivity } = getData();
         set((state) => ({
           collections: state.collections.map((col) =>
             col.id === collectionId
               ? {
                   ...col,
-                  articles: col.articles.map((art) =>
-                    art.id === articleId ? { ...art, ...updates } : art
+                  products: col.products.map((p) =>
+                    p.id === productId ? { ...p, ...updates } : p
                   ),
                 }
               : col
@@ -276,231 +406,236 @@ export const useDataStore = create<DataStore>()(
           isSaving: true,
         }));
 
-        /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
-        const { sizes, placements, colors, images, ...baseFields } = updates;
+        const { bom_items, materials, colorways, placements, measurement_points, ...baseFields } = updates as any; // Cast added to safely destruct remaining fields
 
         try {
           if (Object.keys(baseFields).length > 0) {
-            const { error } = await supabase.from('articles').update(baseFields).eq('id', articleId);
-            if (error) console.error("Error updating article:", error);
+            await supabase.from('products').update(baseFields).eq('id', productId);
           }
 
-          // Handle relational
-          if (sizes) {
-            await supabase.from('sizes').delete().eq('article_id', articleId);
-            if (sizes.length > 0) await supabase.from('sizes').insert(sizes.map(s => ({ ...s, article_id: articleId })));
+          if (bom_items && bom_items.length > 0) {
+            await supabase.from('bom_items').delete().eq('product_id', productId);
+            await supabase.from('bom_items').insert(bom_items.map((b: any) => ({ ...b, product_id: productId })));
           }
-          if (colors) {
-            await supabase.from('pantone_colors').delete().eq('article_id', articleId);
-            if (colors.length > 0) await supabase.from('pantone_colors').insert(colors.map(c => ({ ...c, article_id: articleId })));
+
+          if (materials && materials.length > 0) {
+            await supabase.from('materials').delete().eq('product_id', productId);
+            await supabase.from('materials').insert(materials.map((m: any) => ({ ...m, product_id: productId })));
           }
-          if (placements) {
-            await supabase.from('artwork_placements').delete().eq('article_id', articleId);
-            if (placements.length > 0) await supabase.from('artwork_placements').insert(placements.map(p => ({ ...p, article_id: articleId })));
+
+          if (colorways && colorways.length > 0) {
+            await supabase.from('colorways').delete().eq('product_id', productId);
+            await supabase.from('colorways').insert(colorways.map((c: any) => ({ ...c, product_id: productId })));
           }
-          if (updates.bom_items) {
-            await supabase.from('bom_items').delete().eq('article_id', articleId);
-            if (updates.bom_items.length > 0) await supabase.from('bom_items').insert(updates.bom_items.map(b => ({ ...b, article_id: articleId })));
-          }
-          if (updates.measurement_points) {
-            // This is more complex because of nested values
-            await supabase.from('measurement_points').delete().eq('article_id', articleId);
-            for (const mp of updates.measurement_points) {
-              const { values, ...pointData } = mp;
-              const { data: newPoint, error: pError } = await supabase
-                .from('measurement_points')
-                .insert([{ ...pointData, article_id: articleId }])
-                .select()
-                .single();
-              
-              if (!pError && newPoint && values?.length) {
-                await supabase.from('measurement_values').insert(
-                  values.map(v => ({ ...v, point_id: newPoint.id }))
-                );
-              }
+
+          if (measurement_points && measurement_points.length > 0) {
+            await supabase.from('measurement_points').delete().eq('product_id', productId);
+            for (const point of measurement_points) {
+               const { id, values, ...pData } = point;
+               const { data: newPoint } = await supabase.from('measurement_points').insert([{ ...pData, product_id: productId }]).select().single();
+               if (newPoint && values && values.length > 0) {
+                  await supabase.from('measurement_values').insert(values.map((v: any) => ({ ...v, point_id: newPoint.id })));
+               }
             }
           }
+
+          if (placements) {
+            // Store placements in tech_pack_sections for now
+            await supabase.from('tech_pack_sections').delete().eq('product_id', productId).eq('section_type', 'sketches');
+            await supabase.from('tech_pack_sections').insert([{
+              product_id: productId,
+              section_type: 'sketches',
+              data: { placements },
+              order_index: 0
+            }]);
+          }
+          
+          logActivity('updated', 'product', productId, { fields: Object.keys(updates) });
         } finally {
           set({ isSaving: false });
         }
       },
 
-      removeArticle: async (collectionId: string, articleId: string) => {
-        const { error } = await supabase.from('articles').delete().eq('id', articleId);
-        if (error) console.error("Error removing article:", error);
-
-        set((state) => {
-          const collection = state.collections.find((c) => c.id === collectionId);
-          const remainingArticles = collection?.articles.filter((a) => a.id !== articleId) || [];
-          
-          const uiStore = useUIStore.getState();
-          if (uiStore.activeArticleId === articleId) {
-             uiStore.setActiveArticle(remainingArticles[0]?.id ?? null);
+      removeProduct: async (collectionId: string, productId: string) => {
+        const { logActivity } = getData();
+        
+        try {
+          // 1. Cleanup Storage
+          const { data: files } = await supabase.storage.from('tech-pack-assets').list(productId);
+          if (files && files.length > 0) {
+            await supabase.storage.from('tech-pack-assets').remove(files.map(f => `${productId}/${f.name}`));
           }
 
-          return {
+          // 2. Delete DB Record (Cascades will handles sub-entities)
+          await supabase.from('products').delete().eq('id', productId);
+          
+          set((state) => ({
             collections: state.collections.map((col) =>
-              col.id === collectionId ? { ...col, articles: remainingArticles } : col
+              col.id === collectionId ? { ...col, products: col.products.filter(p => p.id !== productId) } : col
             ),
-          };
-        });
-      },
-      
-      removeCollection: async (collectionId: string) => {
-        const { error } = await supabase.from('collections').delete().eq('id', collectionId);
-        if (error) console.error("Error removing collection:", error);
-
-        set((state) => {
-          const remainingCollections = state.collections.filter((c) => c.id !== collectionId);
+          }));
           
-          const uiStore = useUIStore.getState();
-          if (uiStore.activeCollectionId === collectionId) {
-             const newColId = remainingCollections[0]?.id ?? null;
-             uiStore.setActiveCollection(newColId);
-             uiStore.setActiveArticle(remainingCollections[0]?.articles?.[0]?.id ?? null);
-          }
-
-          return {
-            collections: remainingCollections,
-          };
-        });
-      },
-
-      duplicateArticle: async (collectionId: string, articleId: string) => {
-        const user = useCollaborationStore.getState().user;
-        if (!user) return;
-
-        const { data: original, error: fetchError } = await supabase
-          .from('articles')
-          .select('*, sizes(*), artwork_placements(*), pantone_colors(*), article_images(*), bom_items(*), measurement_points(*, measurement_values(*))')
-          .eq('id', articleId)
-          .single();
-
-        if (fetchError || !original) return;
-
-        const { data: duplicate, error: insertError } = await supabase
-          .from('articles')
-          .insert([{
-            collection_id: collectionId,
-            product_name: `${original.product_name} (Copy)`,
-            reference_code: original.reference_code,
-            garment_type: original.garment_type,
-            gender: original.gender,
-            fit: original.fit,
-            brand: original.brand,
-            customer_po: original.customer_po,
-            disclaimer_enabled: original.disclaimer_enabled,
-            disclaimer_text: original.disclaimer_text,
-            fabric_main: original.fabric_main,
-            fabric_secondary: original.fabric_secondary,
-            weight_gsm: original.weight_gsm,
-            label_type: original.label_type,
-            label_position: original.label_position,
-            label_content: original.label_content,
-            packaging: original.packaging,
-            packaging_notes: original.packaging_notes,
-            status: "draft",
-            created_by: user.id
-          }])
-          .select()
-          .single();
-
-        if (insertError || !duplicate) return;
-
-        if (original.sizes?.length) await supabase.from('sizes').insert(original.sizes.map((item: Record<string, unknown>) => { const { id, created_at, ...rest } = item; return { ...rest, article_id: duplicate.id }; }));
-        if (original.pantone_colors?.length) await supabase.from('pantone_colors').insert(original.pantone_colors.map((item: Record<string, unknown>) => { const { id, created_at, ...rest } = item; return { ...rest, article_id: duplicate.id }; }));
-        if (original.artwork_placements?.length) await supabase.from('artwork_placements').insert(original.artwork_placements.map((item: Record<string, unknown>) => { const { id, created_at, ...rest } = item; return { ...rest, article_id: duplicate.id }; }));
-        if (original.article_images?.length) await supabase.from('article_images').insert(original.article_images.map((item: Record<string, unknown>) => { const { id, created_at, ...rest } = item; return { ...rest, article_id: duplicate.id }; }));
-        if (original.bom_items?.length) await supabase.from('bom_items').insert(original.bom_items.map((item: Record<string, unknown>) => { const { id, created_at, ...rest } = item; return { ...rest, article_id: duplicate.id }; }));
-        
-        if (original.measurement_points?.length) {
-          for (const mp of original.measurement_points) {
-            const { id: oldId, created_at: ca, measurement_values, ...pointData } = mp;
-            const { data: newPoint } = await supabase.from('measurement_points').insert([{ ...pointData, article_id: duplicate.id }]).select().single();
-            if (newPoint && measurement_values?.length) {
-               await supabase.from('measurement_values').insert(measurement_values.map((v: any) => {
-                 const { id, created_at, ...valData } = v;
-                 return { ...valData, point_id: newPoint.id };
-               }));
-            }
-          }
+          logActivity('deleted', 'product', productId);
+        } catch (error) {
+          console.error("Failed to fully remove product:", error);
+          alert("Verwijderen mislukt: Probeer het later opnieuw.");
         }
-
-        await getData().fetchCollections();
-        useUIStore.getState().setActiveArticle(duplicate.id);
       },
-      
-      reorderArticles: (collectionId: string, articles: TechPackArticle[]) =>
-        set((state) => ({
-          collections: state.collections.map((col) =>
-            col.id === collectionId ? { ...col, articles } : col
-          ),
-        })),
 
-      sortArticlesByName: (collectionId: string) =>
-        set((state) => ({
-          collections: state.collections.map((col) =>
-            col.id === collectionId
-              ? {
-                  ...col,
-                  articles: [...col.articles].sort((a, b) => {
-                    const nameA = (a.reference_code || a.product_name || "").toLowerCase();
-                    const nameB = (b.reference_code || b.product_name || "").toLowerCase();
-                    return nameA.localeCompare(nameB);
-                  }),
-                }
-              : col
-          ),
-        })),
+      removeCollection: async (collectionId: string) => {
+        const { logActivity } = getData();
+        await supabase.from('collections').delete().eq('id', collectionId);
+        set((state) => ({ collections: state.collections.filter(c => c.id !== collectionId) }));
+        logActivity('deleted', 'collection', collectionId);
+      },
 
-      uploadArticleImage: async (articleId: string, file: File, view: ArticleImage['view']) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${articleId}/${view}_${Date.now()}.${fileExt}`;
+      duplicateProduct: async (collectionId: string, productId: string) => {
+        const { organizationId, fetchCollections, logActivity } = getData();
+        const user = useCollaborationStore.getState().user;
+        if (!user || !organizationId) return;
+
+        set({ isSaving: true });
         
-        let timeoutId: NodeJS.Timeout;
-        const timeout = new Promise<never>((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error("De upload duurt te lang. Controleer je internetverbinding.")), 60000);
-        });
+        // Track for rollback
+        let newProductId: string | null = null;
+        const copiedPaths: string[] = [];
 
         try {
-          const uploadPromise = supabase.storage.from('tech-pack-assets').upload(fileName, file);
-          const { data, error: uploadError } = await (Promise.race([uploadPromise, timeout]) as any);
-          
-          clearTimeout(timeoutId!); // Ensure we always clear the ghost error
-          
-          if (uploadError) {
-             console.error("Supabase Upload Reject:", uploadError);
-             throw new Error(uploadError.message || "Upload geblokkeerd (misschien ontbreekt de 'tech-pack-assets' Storage Bucket)");
+          // 1. Fetch Original with Full State
+          const { data: orig, error: fetchErr } = await supabase
+            .from('products')
+            .select(`
+              *,
+              bom_items(*),
+              materials(*),
+              colorways(*),
+              measurement_points(*, values:measurement_values(*)),
+              product_files(*),
+              tech_pack_sections(*)
+            `)
+            .eq('id', productId)
+            .single();
+
+          if (fetchErr || !orig) throw new Error("Could not fetch original product data");
+
+          // 2. Create New Product Record
+          const { data: copy, error: copyErr } = await supabase.from('products').insert([{
+            collection_id: collectionId,
+            organization_id: organizationId,
+            name: `${orig.name} (Copy)`,
+            article_code: orig.article_code ? `${orig.article_code}-COPY` : "",
+            category: orig.category,
+            gender: orig.gender,
+            description: orig.description,
+            customer_po: orig.customer_po,
+            garment_type: orig.garment_type,
+            fabric_main: orig.fabric_main,
+            fabric_secondary: orig.fabric_secondary,
+            weight_gsm: orig.weight_gsm,
+            status: "draft",
+            created_by: user.id
+          }]).select().single();
+
+          if (copyErr || !copy) throw new Error("Failed to create product record");
+          newProductId = copy.id;
+
+          // 3. Replicate Storage Files
+          if (orig.product_files?.length) {
+            for (const file of orig.product_files) {
+              const fileExt = file.file_url.split('.').pop();
+              const newPath = `${newProductId}/${file.view}_${Date.now()}.${fileExt}`;
+              
+              const { error: storageErr } = await supabase.storage
+                .from('tech-pack-assets')
+                .copy(file.file_url, newPath);
+
+              if (storageErr) throw new Error(`Storage copy failed: ${storageErr.message}`);
+              copiedPaths.push(newPath);
+
+              const { data: { publicUrl } } = supabase.storage.from('tech-pack-assets').getPublicUrl(newPath);
+
+              await supabase.from('product_files').insert([{
+                product_id: newProductId,
+                file_type: file.file_type,
+                file_url: newPath,
+                public_url: publicUrl,
+                view: file.view,
+                file_name: file.file_name,
+                uploaded_by: user.id
+              }]);
+            }
           }
-          if (!data?.path) throw new Error("Geen bestandspad ontvangen na upload.");
 
-          const { data: { publicUrl } } = supabase.storage.from('tech-pack-assets').getPublicUrl(data.path);
+          // 4. Duplicate Sub-Entities (Batch)
+          if (orig.bom_items?.length) await supabase.from('bom_items').insert(orig.bom_items.map((b: any) => { const { id, ...rest } = b; return { ...rest, product_id: newProductId }; }));
+          if (orig.materials?.length) await supabase.from('materials').insert(orig.materials.map((m: any) => { const { id, ...rest } = m; return { ...rest, product_id: newProductId }; }));
+          if (orig.colorways?.length) await supabase.from('colorways').insert(orig.colorways.map((c: any) => { const { id, ...rest } = c; return { ...rest, product_id: newProductId }; }));
+          if (orig.tech_pack_sections?.length) await supabase.from('tech_pack_sections').insert(orig.tech_pack_sections.map((s: any) => { const { id, ...rest } = s; return { ...rest, product_id: newProductId }; }));
 
-          // Record in DB
-          const { error: insertError } = await supabase.from('article_images').insert([{
-            article_id: articleId,
-            view,
-            storage_path: data.path,
-            public_url: publicUrl,
-            file_name: file.name,
-            file_size_kb: Math.round(file.size / 1024)
-          }]);
+          // 5. Duplicate POMs with nested values
+          if (orig.measurement_points?.length) {
+            for (const point of orig.measurement_points) {
+              const { id: oldPointId, values, ...pointData } = point;
+              const { data: newPoint, error: pointErr } = await supabase
+                .from('measurement_points')
+                .insert([{ ...pointData, product_id: newProductId }])
+                .select()
+                .single();
+              
+              if (!pointErr && newPoint && values?.length) {
+                await supabase.from('measurement_values').insert(values.map((v: any) => {
+                  const { id, point_id, ...valRest } = v;
+                  return { ...valRest, point_id: newPoint.id };
+                }));
+              }
+            }
+          }
+          
+          await fetchCollections();
+          logActivity('duplicated', 'product', newProductId, { original_id: productId });
+          useUIStore.getState().setActiveArticle(newProductId);
 
-          if (insertError) {
-             console.error("Database Insert Reject:", insertError);
-             throw insertError;
+        } catch (error: any) {
+          console.error("Atomic Duplication Failed:", error);
+          
+          // Cleanup / Rollback
+          if (copiedPaths.length > 0) {
+            await supabase.storage.from('tech-pack-assets').remove(copiedPaths);
+          }
+          if (newProductId) {
+            await supabase.from('products').delete().eq('id', newProductId);
           }
 
-          return publicUrl;
-        } catch (err: any) {
-          clearTimeout(timeoutId!);
-          console.error("Storage upload helper error:", err);
-          throw err;
+          alert(`Dupliceren mislukt: ${error.message || "Onbekende fout"}`);
+        } finally {
+          set({ isSaving: false });
         }
       },
+
+      uploadProductImage: async (productId: string, file: File, view: ProductImage['view']) => {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${productId}/${view}_${Date.now()}.${fileExt}`;
+        const { data: uploadData, error: uploadErr } = await supabase.storage.from('tech-pack-assets').upload(fileName, file);
+        if (uploadErr || !uploadData) throw new Error("Upload failed: " + uploadErr?.message);
+
+        const { data: { publicUrl } } = supabase.storage.from('tech-pack-assets').getPublicUrl(uploadData.path);
+        
+        const { error: dbErr } = await supabase.from('product_files').insert([{
+          product_id: productId,
+          file_type: view === 'artwork' ? 'other' : 'technical_sketch',
+          file_url: uploadData.path,
+          public_url: publicUrl,
+          view,
+          file_name: file.name
+        }]);
+
+        if (dbErr) throw dbErr;
+
+        return publicUrl;
+      }
     }),
     {
-      name: "tech-pack-data-storage",
+      name: "vlv-data-storage-v3",
       storage: createJSONStorage(() => idbStorage),
     }
   )

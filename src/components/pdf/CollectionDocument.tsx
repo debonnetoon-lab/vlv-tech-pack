@@ -10,7 +10,7 @@ interface Props {
 export const CollectionDocument = ({ collection }: Props) => {
   return (
     <Document>
-      {collection.articles.map((article) => (
+      {collection.products.map((article) => (
         <TechPackPages 
           key={article.id} 
           article={article} 

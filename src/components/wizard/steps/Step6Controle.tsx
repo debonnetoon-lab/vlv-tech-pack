@@ -1,16 +1,16 @@
 "use client";
 
 import React from "react";
-import { TechPackArticle } from "@/types/tech-pack";
+import { TechPackProduct } from "@/types/tech-pack";
 import { AlertCircle, CheckCircle2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export default function Step6Controle({ article, collectionId }: { article: TechPackArticle, collectionId: string }) {
+export default function Step6Controle({ article, collectionId }: { article: TechPackProduct, collectionId: string }) {
   const warnings = [];
-  if (!article.reference_code) warnings.push("Geen referentiecode (artikelcode) ingevuld.");
-  if (!article.product_name) warnings.push("Geen productnaam ingevuld.");
+  if (!article.article_code) warnings.push("Geen referentiecode (artikelcode) ingevuld.");
+  if (!article.name) warnings.push("Geen productnaam ingevuld.");
   if (!article.images || article.images.length === 0) warnings.push("Geen afbeeldingen toegevoegd.");
-  if (!article.colors || article.colors.length === 0) warnings.push("Geen kleuren gedefinieerd.");
+  if (!article.colorways || article.colorways.length === 0) warnings.push("Geen kleuren gedefinieerd.");
   if (!article.placements || article.placements.length === 0) warnings.push("Geen print-plaatsingen opgegeven.");
 
   return (
@@ -59,11 +59,11 @@ export default function Step6Controle({ article, collectionId }: { article: Tech
               <div className="space-y-2">
                  <div className="flex justify-between text-xs">
                     <span className="text-slate-500 text-left">Product:</span>
-                    <span className="font-bold text-slate-900 text-right">{article.product_name || "-"}</span>
+                    <span className="font-bold text-slate-900 text-right">{article.name || "-"}</span>
                  </div>
                  <div className="flex justify-between text-xs">
                     <span className="text-slate-500 text-left">Ref Code:</span>
-                    <span className="font-bold text-slate-900 text-right">{article.reference_code || "-"}</span>
+                    <span className="font-bold text-slate-900 text-right">{article.article_code || "-"}</span>
                  </div>
                  <div className="flex justify-between text-xs">
                     <span className="text-slate-500 text-left">Basis:</span>
@@ -75,7 +75,7 @@ export default function Step6Controle({ article, collectionId }: { article: Tech
                  </div>
                  <div className="flex justify-between text-xs">
                     <span className="text-slate-500 text-left">Kleuren:</span>
-                    <span className="font-bold text-slate-900 text-right">{article.colors?.length || 0}</span>
+                    <span className="font-bold text-slate-900 text-right">{article.colorways?.length || 0}</span>
                  </div>
               </div>
            </div>

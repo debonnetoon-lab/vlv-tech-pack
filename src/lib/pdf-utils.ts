@@ -1,15 +1,15 @@
 import { useTechPackStore } from "@/store";
-import { TechPackArticle, ArticleImage } from "@/types/tech-pack";
+import { TechPackProduct, ProductImage } from "@/types/tech-pack";
 import { assetStorage } from "@/store/useDataStore";
 
 /**
  * Resolves all "asset:ID" public_urls in an article's images to their actual base64 data.
  * Used before PDF generation to ensure images render without network calls.
  */
-export async function resolveArticleAssets(article: TechPackArticle): Promise<TechPackArticle> {
+export async function resolveArticleAssets(article: TechPackProduct): Promise<TechPackProduct> {
   if (!article.images || article.images.length === 0) return article;
 
-  const resolvedImages: ArticleImage[] = await Promise.all(
+  const resolvedImages: ProductImage[] = await Promise.all(
     article.images.map(async (img) => {
       if (img.public_url?.startsWith("asset:")) {
         const assetId = img.public_url.split(":")[1];
@@ -26,6 +26,6 @@ export async function resolveArticleAssets(article: TechPackArticle): Promise<Te
 /**
  * Resolves assets for all articles in a collection.
  */
-export async function resolveCollectionAssets(articles: TechPackArticle[]): Promise<TechPackArticle[]> {
+export async function resolveCollectionAssets(articles: TechPackProduct[]): Promise<TechPackProduct[]> {
   return Promise.all(articles.map(resolveArticleAssets));
 }

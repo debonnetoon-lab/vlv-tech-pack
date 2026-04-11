@@ -1,328 +1,251 @@
--- ============================================================
---  VLV Tech Pack Builder v2 — Supabase Schema
---  Voer dit uit in: Supabase Dashboard > SQL Editor
--- ============================================================
+-- ─────────────────────────────────────────────
+--  0. CLEAN START (Automated)
+-- ─────────────────────────────────────────────
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+
+-- Ensure the public schema is accessible again
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON SCHEMA public TO postgres;
+GRANT ALL ON SCHEMA public TO dashboard_user;
 
 -- ─────────────────────────────────────────────
---  CLEANUP (Verwijdert testdata en oude structuur)
+--  1. ORGANIZATIONS & USERS
 -- ─────────────────────────────────────────────
-DROP TRIGGER IF EXISTS trg_on_auth_user_created ON auth.users CASCADE;
 
-DROP TABLE IF EXISTS public.shares CASCADE;
-DROP TABLE IF EXISTS public.activity_log CASCADE;
-DROP TABLE IF EXISTS public.field_locks CASCADE;
-DROP TABLE IF EXISTS public.article_images CASCADE;
-DROP TABLE IF EXISTS public.pantone_colors CASCADE;
-DROP TABLE IF EXISTS public.artwork_placements CASCADE;
-DROP TABLE IF EXISTS public.bom_items CASCADE;
-DROP TABLE IF EXISTS public.measurement_values CASCADE;
-DROP TABLE IF EXISTS public.measurement_points CASCADE;
-DROP TABLE IF EXISTS public.sizes CASCADE;
-DROP TABLE IF EXISTS public.articles CASCADE;
-DROP TABLE IF EXISTS public.collections CASCADE;
-DROP TABLE IF EXISTS public.organization_members CASCADE;
-DROP TABLE IF EXISTS public.organizations CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
-
-DROP TYPE IF EXISTS garment_type CASCADE;
-DROP TYPE IF EXISTS gender_type CASCADE;
-DROP TYPE IF EXISTS fit_type CASCADE;
-DROP TYPE IF EXISTS label_position CASCADE;
-DROP TYPE IF EXISTS packaging_type CASCADE;
-
--- ─────────────────────────────────────────────
---  EXTENSIES
--- ─────────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- ─────────────────────────────────────────────
---  ENUM TYPES
--- ─────────────────────────────────────────────
-CREATE TYPE garment_type AS ENUM (
-  'jersey', 'bib_shorts', 'jacket', 'vest', 'gloves',
-  'socks', 'cap', 'skinsuit', 'other'
+CREATE TABLE public.organizations (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name          TEXT NOT NULL,
+  slug          TEXT UNIQUE NOT NULL,
+  logo_url      TEXT,
+  currency      TEXT DEFAULT 'EUR',
+  size_system   TEXT DEFAULT 'EU',
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now()
 );
 
-CREATE TYPE gender_type AS ENUM ('men', 'women', 'unisex', 'kids');
-
-CREATE TYPE fit_type AS ENUM ('race', 'sport', 'relaxed', 'custom');
-
-CREATE TYPE label_position AS ENUM (
-  'neck', 'hem', 'sleeve', 'inside', 'outside', 'none'
-);
-
-CREATE TYPE packaging_type AS ENUM (
-  'polybag', 'hanger', 'box', 'custom', 'none'
-);
-
--- ─────────────────────────────────────────────
---  TABEL: profiles  (uitbreiding op auth.users)
--- ─────────────────────────────────────────────
 CREATE TABLE public.profiles (
   id            UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name     TEXT NOT NULL DEFAULT '',
-  initials      TEXT GENERATED ALWAYS AS (
-                  UPPER(SUBSTRING(full_name FROM 1 FOR 1))
-                ) STORED,
-  avatar_color  TEXT NOT NULL DEFAULT '#E63946',  -- VLV rood als default
-  role          TEXT NOT NULL DEFAULT 'user',     -- 'admin' | 'user' | 'input'
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  avatar_url    TEXT,
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now()
 );
 
--- ─────────────────────────────────────────────
---  TABEL: organizations
--- ─────────────────────────────────────────────
-CREATE TABLE public.organizations (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name          TEXT NOT NULL,
-  created_by    UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ─────────────────────────────────────────────
---  TABEL: organization_members
--- ─────────────────────────────────────────────
 CREATE TABLE public.organization_members (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-  user_id         UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  role            TEXT NOT NULL DEFAULT 'member', -- 'owner' | 'admin' | 'member'
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE(organization_id, user_id)
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id         UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  role            TEXT CHECK (role IN ('owner','admin','designer','viewer')),
+  invited_by      UUID REFERENCES auth.users(id),
+  accepted_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ DEFAULT now()
 );
 
 -- ─────────────────────────────────────────────
---  TABEL: shares (Token based read access)
+--  2. COLLECTIONS & PRODUCTS
 -- ─────────────────────────────────────────────
-CREATE TABLE public.shares (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  collection_id   UUID, -- foreign key added later to avoid circular dependency
-  article_id      UUID, -- foreign key added later
-  token           TEXT NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(16), 'hex'),
-  created_by      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  expires_at      TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
--- ─────────────────────────────────────────────
---  TABEL: collections
--- ─────────────────────────────────────────────
+
 CREATE TABLE public.collections (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  organization_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
   name            TEXT NOT NULL,
-  season          TEXT,                             -- bijv. 'SS2025'
-  year            SMALLINT,
-  description     TEXT,
-  created_by      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  season          TEXT CHECK (season IN ('SS','FW','Resort','Cruise')),
+  year            INT,
+  status          TEXT CHECK (status IN ('draft','active','archived')) DEFAULT 'draft',
+  cover_image_url TEXT,
+  created_by      UUID REFERENCES auth.users(id),
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
--- Voeg foreign keys toe aan shares (nu collections en articles (hierna) bestaan)
-ALTER TABLE public.shares ADD CONSTRAINT fk_shares_collection FOREIGN KEY (collection_id) REFERENCES public.collections(id) ON DELETE CASCADE;
--- Voor article_id doen we het nadat articles tabel is aangemaakt.
-
--- ─────────────────────────────────────────────
---  TABEL: articles  (kledingstukken / producten)
--- ─────────────────────────────────────────────
-CREATE TABLE public.articles (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  collection_id   UUID NOT NULL REFERENCES public.collections(id) ON DELETE CASCADE,
-  reference_code  TEXT,                           -- bijv. 'VLV-JRS-001'
-  product_name    TEXT NOT NULL DEFAULT '',
-  garment_type    garment_type NOT NULL DEFAULT 'jersey',
-  gender          gender_type NOT NULL DEFAULT 'unisex',
-  fit             fit_type NOT NULL DEFAULT 'race',
-  brand           TEXT DEFAULT 'Vive le Vélo',
-  season          TEXT,
-  year            SMALLINT,
+CREATE TABLE public.products (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  collection_id   UUID REFERENCES collections(id) ON DELETE SET NULL,
+  name            TEXT NOT NULL,
+  article_code    TEXT,
+  category        TEXT,
+  gender          TEXT CHECK (gender IN ('men','women','unisex','kids')),
+  status          TEXT CHECK (status IN ('draft','in_review','approved','rejected')) DEFAULT 'draft',
   description     TEXT,
-
-  -- Stap 1 — Basisgegevens (extra velden)
+  customer_po     TEXT,
+  garment_type    TEXT,
   fabric_main     TEXT,
   fabric_secondary TEXT,
-  weight_gsm      SMALLINT,
-
-  -- Stap 6 — Label
-  label_type      TEXT,
-  label_position  label_position DEFAULT 'neck',
-  label_content   TEXT,
-
-  -- Stap 7 — Verpakking
-  packaging       packaging_type DEFAULT 'polybag',
-  packaging_notes TEXT,
-
-  -- Status & beheer
-  status          TEXT NOT NULL DEFAULT 'draft',  -- 'draft' | 'review' | 'approved'
-  created_by      UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-ALTER TABLE public.shares ADD CONSTRAINT fk_shares_article FOREIGN KEY (article_id) REFERENCES public.articles(id) ON DELETE CASCADE;
-
--- ─────────────────────────────────────────────
---  TABEL: sizes  (Stap 2 — Afmetingen)
--- ─────────────────────────────────────────────
-CREATE TABLE public.sizes (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  article_id      UUID NOT NULL REFERENCES public.articles(id) ON DELETE CASCADE,
-  size_label      TEXT NOT NULL,                      -- 'XS', 'S', 'M', 'L', 'XL', 'XXL'
-  chest_cm        NUMERIC(5,1),
-  waist_cm        NUMERIC(5,1),
-  hip_cm          NUMERIC(5,1),
-  length_cm       NUMERIC(5,1),
-  sleeve_cm       NUMERIC(5,1),
-  inseam_cm       NUMERIC(5,1),
-  order_quantity  INTEGER DEFAULT 0,                  -- bestelhoeveelheid per maat
-  sort_order      SMALLINT NOT NULL DEFAULT 0,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  weight_gsm      INT,
+  ai_measurement  JSONB DEFAULT '{}',
+  created_by      UUID REFERENCES auth.users(id),
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
 -- ─────────────────────────────────────────────
---  TABEL: artwork_placements  (Stap 3 — Artwork)
+--  3. SECTIONS & STRUCTURED DATA
 -- ─────────────────────────────────────────────
-CREATE TABLE public.artwork_placements (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  article_id      UUID NOT NULL REFERENCES public.articles(id) ON DELETE CASCADE,
-  placement_name  TEXT NOT NULL,                  -- bijv. 'Front chest', 'Back hem'
-  position_x      NUMERIC(6,2),                  -- % van breedte
-  position_y      NUMERIC(6,2),                  -- % van hoogte
-  width_cm        NUMERIC(5,1),
-  height_cm       NUMERIC(5,1),
-  artwork_url     TEXT,                           -- Supabase Storage URL
-  technique       TEXT,                           -- bijv. 'Sublimatie', 'Borduurwerk'
-  notes           TEXT,
-  sort_order      SMALLINT NOT NULL DEFAULT 0,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+-- Flexible sections (construction, labels, packaging, etc.)
+CREATE TABLE public.tech_pack_sections (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id   UUID REFERENCES products(id) ON DELETE CASCADE,
+  section_type TEXT CHECK (section_type IN (
+                'general','sketches','materials','colorways',
+                'measurements','construction','bom','labels')),
+  data         JSONB DEFAULT '{}',
+  order_index  INT DEFAULT 0,
+  updated_at   TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.materials (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id       UUID REFERENCES products(id) ON DELETE CASCADE,
+  name             TEXT,
+  composition      TEXT,
+  weight_gsm       INT,
+  supplier         TEXT,
+  color_reference  TEXT,
+  pantone_code     TEXT,
+  hex_code         TEXT,
+  percentage       INT
+);
+
+CREATE TABLE public.size_charts (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id  UUID REFERENCES products(id) ON DELETE CASCADE,
+  size_system TEXT,
+  sizes       JSONB DEFAULT '[]',
+  measurements JSONB DEFAULT '{}'
+);
+
+CREATE TABLE public.colorways (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id   UUID REFERENCES products(id) ON DELETE CASCADE,
+  name         TEXT,
+  pantone_code TEXT,
+  hex_code     TEXT,
+  image_url    TEXT
+);
+
+CREATE TABLE public.bom_items (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id  UUID REFERENCES products(id) ON DELETE CASCADE,
+  category    TEXT,
+  description TEXT,
+  supplier    TEXT,
+  unit        TEXT,
+  quantity    NUMERIC,
+  unit_price  NUMERIC,
+  currency    TEXT DEFAULT 'EUR'
+);
+
+CREATE TABLE public.measurement_points (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id   UUID REFERENCES products(id) ON DELETE CASCADE,
+  label        TEXT NOT NULL,
+  description  TEXT,
+  tolerance    TEXT,
+  order_index  INT DEFAULT 0
+);
+
+CREATE TABLE public.measurement_values (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  point_id     UUID REFERENCES measurement_points(id) ON DELETE CASCADE,
+  size_label   TEXT NOT NULL,
+  value_cm     NUMERIC NOT NULL DEFAULT 0
 );
 
 -- ─────────────────────────────────────────────
---  TABEL: pantone_colors  (Stap 4 — Pantone)
+--  4. FILES & COLLABORATION
 -- ─────────────────────────────────────────────
-CREATE TABLE public.pantone_colors (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  article_id    UUID NOT NULL REFERENCES public.articles(id) ON DELETE CASCADE,
-  pantone_code  TEXT NOT NULL,                    -- bijv. 'PMS 032 C'
-  color_name    TEXT,                             -- bijv. 'VLV Rood'
-  hex_value     TEXT,                             -- bijv. '#E63946'
-  usage         TEXT,                             -- bijv. 'Logo, pijlen'
-  fabric_part   TEXT,                             -- bijv. 'Voorkant paneel'
-  sort_order    SMALLINT NOT NULL DEFAULT 0,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+CREATE TABLE public.product_files (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id  UUID REFERENCES products(id) ON DELETE CASCADE,
+  file_type   TEXT CHECK (file_type IN (
+              'technical_sketch','reference_image',
+              'pdf','cad','other')),
+  file_url    TEXT,
+  public_url  TEXT,
+  view        TEXT CHECK (view IN ('front', 'back', 'detail', 'artwork')),
+  file_name   TEXT,
+  version     INT DEFAULT 1,
+  uploaded_by UUID REFERENCES auth.users(id),
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.shares (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id     UUID REFERENCES products(id) ON DELETE CASCADE,
+  collection_id  UUID REFERENCES collections(id) ON DELETE CASCADE,
+  token          TEXT UNIQUE NOT NULL DEFAULT gen_random_uuid()::text,
+  shared_by      UUID REFERENCES auth.users(id),
+  expires_at     TIMESTAMPTZ,
+  requires_login BOOLEAN DEFAULT false,
+  permission     TEXT CHECK (permission IN ('view','comment')),
+  created_at     TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.comments (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id   UUID REFERENCES products(id) ON DELETE CASCADE,
+  section_type TEXT,
+  user_id      UUID REFERENCES auth.users(id),
+  content      TEXT NOT NULL,
+  resolved     BOOLEAN DEFAULT false,
+  created_at   TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.export_logs (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  product_id  UUID REFERENCES products(id) ON DELETE CASCADE,
+  exported_by UUID REFERENCES auth.users(id),
+  format      TEXT CHECK (format IN ('pdf','excel','zip')),
+  file_url    TEXT,
+  created_at  TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE public.activity_logs (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
+  user_id         UUID REFERENCES auth.users(id),
+  action          TEXT NOT NULL,
+  entity_type     TEXT NOT NULL,
+  entity_id       UUID,
+  metadata        JSONB DEFAULT '{}',
+  created_at      TIMESTAMPTZ DEFAULT now()
 );
 
 -- ─────────────────────────────────────────────
---  TABEL: article_images  (Visuele assets via Supabase Storage)
+--  5. TRIGGERS & RLS
 -- ─────────────────────────────────────────────
-CREATE TABLE public.article_images (
-  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  article_id    UUID NOT NULL REFERENCES public.articles(id) ON DELETE CASCADE,
-  view          TEXT NOT NULL,                    -- 'front' | 'back' | 'detail' | 'artwork'
-  storage_path  TEXT NOT NULL,                    -- pad in Supabase Storage bucket
-  public_url    TEXT NOT NULL,
-  file_name     TEXT,
-  file_size_kb  INTEGER,
-  uploaded_by   UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
 
--- ─────────────────────────────────────────────
---  TABEL: field_locks  (Realtime field-level locking)
--- ─────────────────────────────────────────────
-CREATE TABLE public.field_locks (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  article_id  UUID NOT NULL REFERENCES public.articles(id) ON DELETE CASCADE,
-  field_key   TEXT NOT NULL,                      -- bijv. 'product_name', 'sizes[0].chest_cm'
-  locked_by   UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  locked_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  expires_at  TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '30 seconds'),
-  UNIQUE(article_id, field_key)
-);
-
--- ─────────────────────────────────────────────
---  TABEL: activity_log  (Audit trail)
--- ─────────────────────────────────────────────
-CREATE TABLE public.activity_log (
-  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id     UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  article_id  UUID REFERENCES public.articles(id) ON DELETE SET NULL,
-  action      TEXT NOT NULL,                      -- 'created' | 'updated' | 'exported_pdf' | 'deleted'
-  field_key   TEXT,
-  old_value   TEXT,
-  new_value   TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- ═══════════════════════════════════════════════
---  INDEXEN
--- ═══════════════════════════════════════════════
-CREATE INDEX idx_org_members_user       ON public.organization_members(user_id);
-CREATE INDEX idx_collections_org        ON public.collections(organization_id);
-CREATE INDEX idx_articles_collection    ON public.articles(collection_id);
-CREATE INDEX idx_articles_status        ON public.articles(status);
-CREATE INDEX idx_sizes_article          ON public.sizes(article_id);
-CREATE INDEX idx_artwork_article        ON public.artwork_placements(article_id);
-CREATE INDEX idx_pantone_article        ON public.pantone_colors(article_id);
-CREATE INDEX idx_images_article         ON public.article_images(article_id);
-CREATE INDEX idx_locks_article          ON public.field_locks(article_id);
-CREATE INDEX idx_locks_expires          ON public.field_locks(expires_at);
-CREATE INDEX idx_log_article            ON public.activity_log(article_id);
-CREATE INDEX idx_log_user               ON public.activity_log(user_id);
-CREATE INDEX idx_shares_token           ON public.shares(token);
-
--- ═══════════════════════════════════════════════
---  AUTOMATISCHE updated_at TRIGGERS
--- ═══════════════════════════════════════════════
-CREATE OR REPLACE FUNCTION public.set_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-  NEW.updated_at = NOW();
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_profiles_updated
-  BEFORE UPDATE ON public.profiles
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-CREATE TRIGGER trg_organizations_updated
-  BEFORE UPDATE ON public.organizations
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-CREATE TRIGGER trg_collections_updated
-  BEFORE UPDATE ON public.collections
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-CREATE TRIGGER trg_articles_updated
-  BEFORE UPDATE ON public.articles
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
--- ═══════════════════════════════════════════════
---  AUTOMATISCH PROFIEL AANMAKEN BIJ REGISTRATIE
--- ═══════════════════════════════════════════════
+-- Trigger: Create Org on Auth Sign-up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
   new_org_id UUID;
-  user_name TEXT;
+  org_name TEXT;
+  full_name TEXT;
 BEGIN
-  user_name := COALESCE(NEW.raw_user_meta_data->>'full_name', SPLIT_PART(NEW.email, '@', 1));
+  full_name := COALESCE(NEW.raw_user_meta_data->>'full_name', SPLIT_PART(NEW.email, '@', 1));
+  org_name := COALESCE(NEW.raw_user_meta_data->>'org_name', full_name || ' Workspace');
 
   -- 1. Create Profile
   INSERT INTO public.profiles (id, full_name)
-  VALUES (NEW.id, user_name);
+  VALUES (NEW.id, full_name);
 
-  -- 2. Create Personal Organization
-  INSERT INTO public.organizations (name, created_by)
-  VALUES (user_name || ' Workspace', NEW.id)
+  -- 2. Create Organization
+  INSERT INTO public.organizations (name, slug)
+  VALUES (org_name, LOWER(REGEXP_REPLACE(org_name, '\s+', '-', 'g')) || '-' || SUBSTRING(gen_random_uuid()::text, 1, 8))
   RETURNING id INTO new_org_id;
 
-  -- 3. Add user as owner of their Workspace
+  -- 3. Add user as Owner
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES (new_org_id, NEW.id, 'owner');
+
+  -- 4. Log Activity (V3 Adjustment)
+  INSERT INTO public.activity_logs (organization_id, user_id, action, entity_type, entity_id)
+  VALUES (new_org_id, NEW.id, 'created', 'organization', new_org_id);
 
   RETURN NEW;
 END;
@@ -332,35 +255,24 @@ CREATE TRIGGER trg_on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- ═══════════════════════════════════════════════
---  VAKOPEN VERLOPEN LOCKS OPRUIMEN (elke 60s)
--- ═══════════════════════════════════════════════
-CREATE OR REPLACE FUNCTION public.cleanup_expired_locks()
-RETURNS void AS $$
-BEGIN
-  DELETE FROM public.field_locks WHERE expires_at < NOW();
-END;
-$$ LANGUAGE plpgsql;
-
--- ═══════════════════════════════════════════════
---  ROW LEVEL SECURITY (RLS) - SaaS MODEL
--- ═══════════════════════════════════════════════
-
--- Activeer RLS op alle tabellen
-ALTER TABLE public.organizations      ENABLE ROW LEVEL SECURITY;
+-- Enable RLS
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organization_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.profiles           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.collections        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.articles           ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.sizes              ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.artwork_placements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.pantone_colors     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.article_images     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.field_locks        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.activity_log       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.shares             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.collections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tech_pack_sections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.size_charts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.colorways ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bom_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.product_files ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shares ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.export_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 
--- ── HELPER FUNCTIE VOOR RLS ──
+-- Dynamic Membership Check Function
 CREATE OR REPLACE FUNCTION public.is_member_of(_org_id UUID)
 RETURNS BOOLEAN AS $$
   SELECT EXISTS (
@@ -369,185 +281,198 @@ RETURNS BOOLEAN AS $$
   );
 $$ LANGUAGE sql SECURITY DEFINER;
 
--- ORGANIZATIONS
+-- New: Role Check Helper
+CREATE OR REPLACE FUNCTION public.has_role_in_org(_org_id UUID, _allowed_roles TEXT[])
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.organization_members
+    WHERE organization_id = _org_id 
+    AND user_id = auth.uid() 
+    AND role = ANY(_allowed_roles)
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- ─────────────────────────────────────────────
+--  5b. RPC: Ensure user has an organization (called on login)
+-- ─────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.ensure_user_organization()
+RETURNS UUID AS $$
+DECLARE
+  v_org_id UUID;
+  v_full_name TEXT;
+  v_org_name TEXT;
+  v_slug TEXT;
+BEGIN
+  -- Check if user already has an org
+  SELECT organization_id INTO v_org_id
+  FROM public.organization_members
+  WHERE user_id = auth.uid()
+  LIMIT 1;
+
+  IF v_org_id IS NOT NULL THEN
+    RETURN v_org_id;
+  END IF;
+
+  -- Get user info
+  SELECT COALESCE(raw_user_meta_data->>'full_name', split_part(email, '@', 1))
+  INTO v_full_name
+  FROM auth.users WHERE id = auth.uid();
+
+  v_org_name := v_full_name || ' Workspace';
+  v_slug := lower(regexp_replace(v_org_name, '\s+', '-', 'g')) || '-' || substring(gen_random_uuid()::text, 1, 8);
+
+  -- Ensure profile exists
+  INSERT INTO public.profiles (id, full_name)
+  VALUES (auth.uid(), v_full_name)
+  ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name;
+
+  -- Create org
+  INSERT INTO public.organizations (name, slug)
+  VALUES (v_org_name, v_slug)
+  RETURNING id INTO v_org_id;
+
+  -- Add as owner
+  INSERT INTO public.organization_members (organization_id, user_id, role)
+  VALUES (v_org_id, auth.uid(), 'owner');
+
+  -- Log activity
+  INSERT INTO public.activity_logs (organization_id, user_id, action, entity_type, entity_id)
+  VALUES (v_org_id, auth.uid(), 'created', 'organization', v_org_id);
+
+  RETURN v_org_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ─────────────────────────────────────────────
+--  6. POLICIES (RBAC ENFORCED)
+-- ─────────────────────────────────────────────
+
+-- Organizations: Read-only for members
 CREATE POLICY "org_select" ON public.organizations FOR SELECT TO authenticated USING (public.is_member_of(id));
-CREATE POLICY "org_update" ON public.organizations FOR UPDATE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.organization_members WHERE organization_id = id AND user_id = auth.uid() AND role IN ('owner', 'admin'))
+
+-- Profiles: Own profile access
+CREATE POLICY "profile_access" ON public.profiles FOR ALL TO authenticated USING (id = auth.uid()) WITH CHECK (id = auth.uid());
+
+-- Organization Members: Only Owner/Admin can modify
+CREATE POLICY "member_select" ON public.organization_members FOR SELECT TO authenticated USING (public.is_member_of(organization_id));
+CREATE POLICY "member_modify" ON public.organization_members FOR ALL TO authenticated 
+  USING (public.has_role_in_org(organization_id, ARRAY['owner','admin']))
+  WITH CHECK (public.has_role_in_org(organization_id, ARRAY['owner','admin']));
+
+-- Collections & Products: Read for all members, Write for Owner/Admin/Designer
+CREATE POLICY "collection_select" ON public.collections FOR SELECT TO authenticated USING (public.is_member_of(organization_id));
+CREATE POLICY "collection_modify" ON public.collections FOR ALL TO authenticated 
+  USING (public.has_role_in_org(organization_id, ARRAY['owner','admin','designer']))
+  WITH CHECK (public.has_role_in_org(organization_id, ARRAY['owner','admin','designer']));
+
+CREATE POLICY "product_select" ON public.products FOR SELECT TO authenticated USING (public.is_member_of(organization_id));
+CREATE POLICY "product_modify" ON public.products FOR ALL TO authenticated 
+  USING (public.has_role_in_org(organization_id, ARRAY['owner','admin','designer']))
+  WITH CHECK (public.has_role_in_org(organization_id, ARRAY['owner','admin','designer']));
+
+-- Technical Tables: Strictly restricted to editors
+CREATE POLICY "section_modify" ON public.tech_pack_sections FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
+) WITH CHECK (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
 );
 
--- ORGANIZATION MEMBERS
-CREATE POLICY "members_select" ON public.organization_members FOR SELECT TO authenticated USING (public.is_member_of(organization_id));
-
--- PROFILES
-CREATE POLICY "profiles_select_all"   ON public.profiles FOR SELECT TO authenticated USING (true);
-CREATE POLICY "profiles_update_own"   ON public.profiles FOR UPDATE TO authenticated USING (auth.uid() = id);
-
--- COLLECTIONS
-CREATE POLICY "collections_select"    ON public.collections FOR SELECT TO authenticated USING (public.is_member_of(organization_id));
-CREATE POLICY "collections_insert"    ON public.collections FOR INSERT TO authenticated WITH CHECK (public.is_member_of(organization_id));
-CREATE POLICY "collections_update"    ON public.collections FOR UPDATE TO authenticated USING (public.is_member_of(organization_id));
-CREATE POLICY "collections_delete"    ON public.collections FOR DELETE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.organization_members WHERE organization_id = collections.organization_id AND user_id = auth.uid() AND role IN ('owner', 'admin'))
+CREATE POLICY "material_modify" ON public.materials FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
+) WITH CHECK (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
 );
 
--- ARTICLES
-CREATE POLICY "articles_select" ON public.articles FOR SELECT TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_id AND public.is_member_of(c.organization_id))
-);
-CREATE POLICY "articles_insert" ON public.articles FOR INSERT TO authenticated WITH CHECK (
-  EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_id AND public.is_member_of(c.organization_id))
-);
-CREATE POLICY "articles_update" ON public.articles FOR UPDATE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_id AND public.is_member_of(c.organization_id))
-);
-CREATE POLICY "articles_delete" ON public.articles FOR DELETE TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_id AND public.is_member_of(c.organization_id))
+CREATE POLICY "colorway_modify" ON public.colorways FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
+) WITH CHECK (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
 );
 
--- SUB-TABELLEN (Relate back to articles)
-CREATE POLICY "sizes_all"             ON public.sizes             FOR ALL TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id))
-) WITH CHECK (true);
-CREATE POLICY "artwork_all"           ON public.artwork_placements FOR ALL TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id))
-) WITH CHECK (true);
-CREATE POLICY "pantone_all"           ON public.pantone_colors    FOR ALL TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id))
-) WITH CHECK (true);
-CREATE POLICY "images_all"            ON public.article_images    FOR ALL TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id))
-) WITH CHECK (true);
-CREATE POLICY "locks_all"             ON public.field_locks       FOR ALL TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id))
-) WITH CHECK (true);
-
--- SHARES (enkel inzien als owner van de collectie/article)
-CREATE POLICY "shares_select" ON public.shares FOR SELECT TO authenticated USING (
-  (collection_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.collections c WHERE c.id = collection_id AND public.is_member_of(c.organization_id)))
-  OR 
-  (article_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.articles a JOIN public.collections c ON a.collection_id = c.id WHERE a.id = article_id AND public.is_member_of(c.organization_id)))
-);
-CREATE POLICY "shares_insert" ON public.shares FOR INSERT TO authenticated WITH CHECK (auth.uid() = created_by);
-
--- ═══════════════════════════════════════════════
---  REALTIME PUBLICATIE
--- ═══════════════════════════════════════════════
--- Activeer realtime voor de tabellen die live updates nodig hebben
-ALTER PUBLICATION supabase_realtime ADD TABLE public.articles;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.collections;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.sizes;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.artwork_placements;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.pantone_colors;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.field_locks;
-
--- ═══════════════════════════════════════════════
---  STORAGE BUCKET
--- ═══════════════════════════════════════════════
--- Voer dit uit na het aanmaken van de tabellen:
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('tech-pack-assets', 'tech-pack-assets', true)
-ON CONFLICT DO NOTHING;
-
--- ─────────────────────────────────────────────
---  FASHION TECH PACK EXTENSIONS (Phase 3)
--- ─────────────────────────────────────────────
-
--- 1. Bill of Materials (BOM)
-CREATE TABLE public.bom_items (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  article_id      UUID NOT NULL REFERENCES public.articles(id) ON DELETE CASCADE,
-  category        TEXT NOT NULL, -- Fabric, Trim, Thread, Label, Packaging, Other
-  description     TEXT NOT NULL,
-  specification   TEXT,          -- e.g. "100% Organic Cotton" or "YKK Zipper"
-  supplier        TEXT,
-  color_code      TEXT,
-  quantity        NUMERIC(10,3) DEFAULT 0,
-  unit            TEXT DEFAULT 'pcs', -- m, pcs, kg, etc.
-  sort_order      SMALLINT DEFAULT 0,
-  created_at      TIMESTAMPTZ DEFAULT now()
+CREATE POLICY "size_chart_modify" ON public.size_charts FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
+) WITH CHECK (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
 );
 
--- 2. Maattabel Meetpunten (Size Specs Points)
-CREATE TABLE public.measurement_points (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  article_id      UUID NOT NULL REFERENCES public.articles(id) ON DELETE CASCADE,
-  label           TEXT NOT NULL, -- e.g. "A: 1/2 Chest width"
-  description     TEXT,          -- e.g. "At 2cm below armhole"
-  tolerance       TEXT,          -- e.g. "+/- 1cm"
-  sort_order      SMALLINT DEFAULT 0,
-  created_at      TIMESTAMPTZ DEFAULT now()
+CREATE POLICY "bom_modify" ON public.bom_items FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
+) WITH CHECK (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
 );
 
--- 3. Maattabel Waarden (Size Specs Values)
-CREATE TABLE public.measurement_values (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  point_id        UUID NOT NULL REFERENCES public.measurement_points(id) ON DELETE CASCADE,
-  size_label      TEXT NOT NULL, -- e.g. "XS", "S", "M"
-  value_cm        NUMERIC(5,1),
-  created_at      TIMESTAMPTZ DEFAULT now()
+CREATE POLICY "measurement_point_modify" ON public.measurement_points FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
+) WITH CHECK (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
+);
+
+CREATE POLICY "measurement_value_modify" ON public.measurement_values FOR ALL TO authenticated USING (
+  EXISTS (
+    SELECT 1 FROM public.measurement_points mp 
+    JOIN public.products p ON mp.product_id = p.id 
+    WHERE mp.id = point_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer'])
+  )
+) WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.measurement_points mp 
+    JOIN public.products p ON mp.product_id = p.id 
+    WHERE mp.id = point_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer'])
+  )
+);
+
+CREATE POLICY "file_modify" ON public.product_files FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
+) WITH CHECK (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.has_role_in_org(p.organization_id, ARRAY['owner','admin','designer']))
+);
+
+-- Comments & Logs: Read for all, Write for members
+CREATE POLICY "comment_read" ON public.comments FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.is_member_of(p.organization_id))
+);
+CREATE POLICY "comment_insert" ON public.comments FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (SELECT 1 FROM public.products p WHERE p.id = product_id AND public.is_member_of(p.organization_id))
+);
+
+CREATE POLICY "activity_log_access" ON public.activity_logs FOR SELECT TO authenticated USING (public.is_member_of(organization_id));
+CREATE POLICY "activity_log_insert" ON public.activity_logs FOR INSERT TO authenticated WITH CHECK (public.is_member_of(organization_id));
+
+-- Public Shares (Token-based)
+CREATE POLICY "public_share_read" ON public.products FOR SELECT TO anon USING (
+  EXISTS (SELECT 1 FROM public.shares s WHERE s.product_id = products.id AND (s.expires_at IS NULL OR s.expires_at > now()))
 );
 
 -- ─────────────────────────────────────────────
---  RLS VOOR NIEUWE TABELLEN
+--  7. PERMISSIONS & GRANTS
 -- ─────────────────────────────────────────────
 
+-- Enable RLS for all critical tables
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.organization_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.collections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tech_pack_sections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.size_charts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.colorways ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.bom_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.measurement_points ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.measurement_values ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.product_files ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.shares ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.export_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 
--- BOM Policies
-CREATE POLICY "Users can manage BOM items of their organizations"
-  ON public.bom_items
-  FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.articles a
-      JOIN public.collections c ON a.collection_id = c.id
-      JOIN public.organization_members om ON c.organization_id = om.organization_id
-      WHERE a.id = public.bom_items.article_id AND om.user_id = auth.uid()
-    )
-  );
+-- Grant access to all existing tables, sequences and functions
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
 
--- Measurement Points Policies
-CREATE POLICY "Users can manage measurement points of their organizations"
-  ON public.measurement_points
-  FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.articles a
-      JOIN public.collections c ON a.collection_id = c.id
-      JOIN public.organization_members om ON c.organization_id = om.organization_id
-      WHERE a.id = public.measurement_points.article_id AND om.user_id = auth.uid()
-    )
-  );
-
--- Measurement Values Policies
-CREATE POLICY "Users can manage measurement values of their organizations"
-  ON public.measurement_values
-  FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.measurement_points mp
-      JOIN public.articles a ON mp.article_id = a.id
-      JOIN public.collections c ON a.collection_id = c.id
-      JOIN public.organization_members om ON c.organization_id = om.organization_id
-      WHERE mp.id = public.measurement_values.point_id AND om.user_id = auth.uid()
-    )
-  );
-
-
--- Storage policies (Existing, but re-run for safety if needed)
-DROP POLICY IF EXISTS "assets_select_all" ON storage.objects;
-CREATE POLICY "assets_select_all"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'tech-pack-assets');
-
-DROP POLICY IF EXISTS "assets_insert_authenticated" ON storage.objects;
-CREATE POLICY "assets_insert_authenticated"
-  ON storage.objects FOR INSERT TO authenticated
-  WITH CHECK (bucket_id = 'tech-pack-assets');
-
-DROP POLICY IF EXISTS "assets_delete_authenticated" ON storage.objects;
-CREATE POLICY "assets_delete_authenticated"
-  ON storage.objects FOR DELETE TO authenticated
-  USING (bucket_id = 'tech-pack-assets');
+-- Ensure future objects also have the correct permissions
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;

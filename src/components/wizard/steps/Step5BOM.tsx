@@ -1,147 +1,106 @@
 "use client";
 
 import React from "react";
-import { TechPackArticle, BOMItem } from "@/types/tech-pack";
 import { useTechPackStore } from "@/store";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Package } from "lucide-react";
+import { Calculator, AlertCircle } from "lucide-react";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
+import { useTechPackValidation } from "@/hooks/useTechPackValidation";
 
-const CATEGORIES = ["Hoofdstof", "Secundair", "Voering", "Garen", "Knopen", "Rits", "Label", "Verpakking", "Overig"];
-
-export default function Step5BOM({ article, collectionId }: { article: TechPackArticle, collectionId: string }) {
-  const { updateArticle } = useTechPackStore();
-
-  const addItem = () => {
-    const currentBOM = article.bom_items || [];
-    const newItem: BOMItem = {
-      article_id: article.id,
-      category: "Hoofdstof",
-      description: "",
-      specification: "",
-      supplier: "",
-      quantity: 0,
-      unit: "pcs"
-    };
-    updateArticle(collectionId, article.id, { bom_items: [...currentBOM, newItem] });
-  };
-
-  const updateItem = (index: number, updates: Partial<BOMItem>) => {
-    const currentBOM = [...(article.bom_items || [])];
-    if (currentBOM[index]) {
-      currentBOM[index] = { ...currentBOM[index], ...updates };
-      updateArticle(collectionId, article.id, { bom_items: currentBOM });
-    }
-  };
-
-  const removeItem = (index: number) => {
-    const currentBOM = article.bom_items || [];
-    updateArticle(collectionId, article.id, {
-      bom_items: currentBOM.filter((_, i) => i !== index)
-    });
-  };
+export default function Step5BOM({ article, collectionId }: { article: any, collectionId: string }) {
+  const { updateProduct } = useTechPackStore();
+  const { missingFields } = useTechPackValidation(article);
+  const isError = missingFields.some(f => f.step === 7 && f.field === 'order_quantity');
+  
+  const totalQuantity = (article.sizes || []).reduce((acc: number, s: any) => acc + (s.order_quantity || 0), 0);
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      <div className="space-y-2">
-        <h2 className="text-3xl font-extrabold tracking-tight">Materiaallijst (BOM)</h2>
-        <p className="text-slate-500">Geef alle materialen en fournituren aan die nodig zijn voor de productie.</p>
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+           <h2 className="text-3xl font-black italic tracking-tighter text-slate-900 uppercase">Order Quantities</h2>
+           <p className="text-slate-400 font-medium">Specifieer de gewenste aantallen per maat.</p>
+        </div>
+        <div className={cn(
+          "text-right px-8 py-4 rounded-[24px] border transition-all duration-500",
+          totalQuantity > 0 ? "bg-slate-900 text-white border-slate-900 shadow-2xl" : "bg-white text-slate-400 border-slate-100"
+        )}>
+           <p className={cn(
+             "text-[10px] font-black uppercase tracking-widest leading-none mb-1",
+             totalQuantity > 0 ? "text-[#22c981]" : "text-slate-300"
+           )}>Totaal Aanvraag</p>
+           <h3 className="text-3xl font-black italic tracking-tighter">{totalQuantity} <span className="text-sm font-bold uppercase opacity-40">pcs</span></h3>
+        </div>
       </div>
 
-      <div className="space-y-6">
-        <div className="overflow-x-auto -mx-6 px-6">
-          <table className="w-full border-collapse min-w-[800px]">
-            <thead>
-              <tr className="border-b border-slate-100 italic">
-                <th className="text-left py-3 px-2 text-[10px] font-black uppercase tracking-widest text-slate-400 w-[140px]">Categorie</th>
-                <th className="text-left py-3 px-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Omschrijving</th>
-                <th className="text-left py-3 px-2 text-[10px] font-black uppercase tracking-widest text-slate-400 w-[150px]">Specificatie</th>
-                <th className="text-left py-3 px-2 text-[10px] font-black uppercase tracking-widest text-slate-400 w-[120px]">Leverancier</th>
-                <th className="text-left py-3 px-2 text-[10px] font-black uppercase tracking-widest text-slate-400 w-[80px]">Hoeveelh.</th>
-                <th className="text-left py-3 px-2 text-[10px] font-black uppercase tracking-widest text-slate-400 w-[60px]">Unit</th>
-                <th className="w-10"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {(article.bom_items || []).map((item, i) => (
-                <tr key={i} className="group hover:bg-slate-50/50 transition-colors">
-                  <td className="py-2 px-2">
-                    <select
-                      value={item.category}
-                      onChange={(e) => updateItem(i, { category: e.target.value })}
-                      className="w-full h-9 px-2 bg-white rounded-lg border border-slate-200 text-xs font-bold focus:ring-0 focus:border-[#22c981]"
-                    >
-                      {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                  </td>
-                  <td className="py-2 px-2">
-                    <Input 
-                      value={item.description}
-                      onChange={(e) => updateItem(i, { description: e.target.value })}
-                      placeholder="bv. 100% Katoen Single Jersey"
-                      className="h-9 text-xs border-slate-200 focus:border-[#22c981]"
-                    />
-                  </td>
-                  <td className="py-2 px-2">
-                    <Input 
-                      value={item.specification || ""}
-                      onChange={(e) => updateItem(i, { specification: e.target.value })}
-                      placeholder="bv. 180 GSM"
-                      className="h-9 text-xs border-slate-200 focus:border-[#22c981]"
-                    />
-                  </td>
-                  <td className="py-2 px-2">
-                    <Input 
-                      value={item.supplier || ""}
-                      onChange={(e) => updateItem(i, { supplier: e.target.value })}
-                      placeholder="bv. VLV Supplier"
-                      className="h-9 text-xs border-slate-200 focus:border-[#22c981]"
-                    />
-                  </td>
-                  <td className="py-2 px-2">
-                    <Input 
-                      type="number"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(i, { quantity: parseFloat(e.target.value) || 0 })}
-                      className="h-9 text-xs border-slate-200 focus:border-[#22c981] text-right"
-                    />
-                  </td>
-                  <td className="py-2 px-2">
-                    <Input 
-                      value={item.unit}
-                      onChange={(e) => updateItem(i, { unit: e.target.value })}
-                      placeholder="m"
-                      className="h-9 text-xs border-slate-200 focus:border-[#22c981]"
-                    />
-                  </td>
-                  <td className="py-2 px-2">
-                    <button 
-                      onClick={() => removeItem(i)}
-                      className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className={cn(
+        "bg-white rounded-[40px] p-10 border transition-all duration-500",
+        isError ? "border-red-100 ring-4 ring-red-50 bg-red-50/10" : "border-slate-100 shadow-xl"
+      )}>
+        <div className="flex items-center justify-between mb-8">
+          <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] flex items-center gap-2">
+            <Calculator className="w-4 h-4" />
+            Quantities per size
+          </h4>
+          {isError && (
+            <div className="flex items-center gap-2 text-red-500 animate-pulse">
+               <AlertCircle className="w-4 h-4" />
+               <span className="text-[10px] font-black uppercase tracking-widest">Minimaal één maat vereist</span>
+            </div>
+          )}
         </div>
+        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-4">
+          {["XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "5XL"].map(size => {
+            const qty = article.sizes?.find((s: any) => s.size_label === size)?.order_quantity || 0;
+            return (
+              <div key={size} className={cn(
+                "p-5 rounded-[24px] border border-slate-100 flex flex-col items-center transition-all group hover:scale-105",
+                qty > 0 ? "bg-[#0b1912] border-[#0b1912] shadow-xl" : "bg-white hover:border-[#22c981]"
+              )}>
+                <div className={cn(
+                  "text-[10px] font-black uppercase mb-3 tracking-widest transition-colors",
+                  qty > 0 ? "text-[#22c981]" : "text-slate-300 group-hover:text-slate-900"
+                )}>{size}</div>
+                <input 
+                  type="number"
+                  min="0"
+                  value={qty || ""}
+                  disabled={isViewer}
+                  onChange={(e) => {
+                    if (isViewer) return;
+                    const num = sanitizeQuantity(e.target.value);
+                    const existingSizes = article.sizes || [];
+                    let newSizes;
+                    if (existingSizes.some((s: any) => s.size_label === size)) {
+                      newSizes = existingSizes.map((s: any) => s.size_label === size ? { ...s, order_quantity: num } : s);
+                    } else {
+                      newSizes = [...existingSizes, { size_label: size, order_quantity: num }];
+                    }
+                    updateProduct(collectionId, article.id, { sizes: newSizes });
+                  }}
+                  className={cn(
+                    "w-full text-center text-2xl font-black bg-transparent border-none outline-none transition-colors italic tracking-tighter disabled:opacity-50",
+                    qty > 0 ? "text-white" : "text-slate-900"
+                  )}
+                  placeholder="0"
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-        {(!article.bom_items || article.bom_items.length === 0) && (
-          <div className="py-20 border-2 border-dashed border-slate-100 rounded-3xl flex flex-col items-center justify-center gap-3 text-slate-400 bg-slate-50/30">
-            <Package className="w-8 h-8 opacity-20" />
-            <p className="text-sm font-medium">Nog geen materialen toegevoegd.</p>
-          </div>
-        )}
-
-        <button
-          onClick={addItem}
-          className="w-full py-4 border-2 border-dashed border-slate-100 rounded-2xl flex items-center justify-center gap-3 text-slate-400 hover:border-[#22c981] hover:bg-[#22c981]/5 hover:text-[#22c981] transition-all font-black uppercase tracking-widest text-[10px]"
-        >
-          <Plus className="w-4 h-4" />
-          Nieuw Item Toevoegen
-        </button>
+      <div className="p-8 bg-[#f8fafc] rounded-[40px] border border-slate-100 flex items-start gap-6">
+         <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center shrink-0">
+            <Info className="w-6 h-6 text-slate-400" />
+         </div>
+         <div className="space-y-1">
+            <h4 className="text-[10px] font-black uppercase text-slate-900 tracking-widest">Order Info</h4>
+            <p className="text-xs text-slate-500 font-medium leading-relaxed">
+               Deze aantallen worden gebruikt door de fabrikant om de productie te plannen. 
+               Zorg dat de totale oplage overeenkomt met je offerte of inkooporder.
+            </p>
+         </div>
       </div>
     </div>
   );

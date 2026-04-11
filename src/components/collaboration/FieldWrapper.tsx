@@ -12,9 +12,10 @@ interface FieldWrapperProps {
   label?: string;
   children: React.ReactElement;
   className?: string;
+  error?: string; // New prop for validation errors
 }
 
-export function FieldWrapper({ articleId, fieldKey, label, children, className }: FieldWrapperProps) {
+export function FieldWrapper({ articleId, fieldKey, label, children, className, error }: FieldWrapperProps) {
   const { isLocked, lockedBy, acquireLock, releaseLock } = useFieldLock(articleId, fieldKey);
 
   const handleFocus = () => {
@@ -29,7 +30,12 @@ export function FieldWrapper({ articleId, fieldKey, label, children, className }
     <div className={`relative ${className || ""}`}>
       {label && (
         <div className="flex justify-between items-center mb-1">
-          <label className="text-sm font-medium text-gray-700">{label}</label>
+          <label className={cn(
+            "text-sm font-medium transition-colors",
+            error ? "text-red-500" : "text-gray-700"
+          )}>
+            {label}
+          </label>
           <AnimatePresence>
             {isLocked && (
               <motion.div
@@ -53,13 +59,27 @@ export function FieldWrapper({ articleId, fieldKey, label, children, className }
       >
         {React.cloneElement(children as React.ReactElement<any>, {
           disabled: isLocked || (children.props as any).disabled,
-          className: `${(children.props as any).className || ""} ${isLocked ? "bg-gray-50 cursor-not-allowed opacity-75 ring-amber-200" : ""}`
+          className: cn(
+            (children.props as any).className || "",
+            isLocked ? "bg-gray-50 cursor-not-allowed opacity-75 ring-amber-200" : "",
+            error ? "border-red-500 focus:border-red-500 focus:ring-red-200 bg-red-50/30" : ""
+          )
         })}
         
         {isLocked && (
           <div className="absolute inset-0 z-10 cursor-not-allowed" title={`${lockedBy} is editing`} />
         )}
       </div>
+
+      {error && (
+        <motion.p 
+          initial={{ opacity: 0, y: -5 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-[10px] font-bold text-red-500 mt-1 ml-1 uppercase tracking-wider"
+        >
+          {error}
+        </motion.p>
+      )}
     </div>
   );
 }

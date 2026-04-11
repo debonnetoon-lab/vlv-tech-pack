@@ -44,8 +44,8 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
     </div>;
   }
 
-  const activeCollection = collections.find((c: any) => c.id === activeCollectionId);
-  const activeArticle = activeCollection?.articles.find((a: any) => a.id === activeArticleId);
+  const activeCollection = (collections || []).find((c: any) => c.id === activeCollectionId);
+  const activeArticle = (activeCollection?.products || []).find((a: any) => a.id === activeArticleId);
 
   const handleNextStep = () => {
     if (activeStep < 8) setActiveStep(activeStep + 1);
@@ -98,61 +98,59 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
 
       {/* ── MAIN CONTENT AREA ── */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#F7F8F7] relative">
-        {/* TOP BAR */}
-        <header className="h-[60px] bg-white border-b border-[#1D9E75]/10 px-4 lg:px-8 flex items-center justify-between flex-shrink-0 z-20">
-          <div className="flex items-center gap-4">
-            {/* Hamburger for Mobile */}
-            <button 
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2 -ml-2 text-slate-400 hover:text-[#0b1912] transition-colors active:scale-90"
-            >
-              <Menu className="w-6 h-6" />
-            </button>
-
-            {/* Punt 11: Interactive Breadcrumbs */}
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400">
-              <button onClick={resetToCollections} className="hover:text-[#0b1912] transition-colors cursor-pointer whitespace-nowrap">Collecties</button>
-              <span className="text-slate-200">/</span>
+        {/* TOP BAR & NAVIGATION AREA */}
+        <header className="bg-white border-b border-slate-100 flex-shrink-0 z-40">
+          <div className="h-[70px] px-8 flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              {/* Hamburger for Mobile */}
               <button 
-                onClick={resetToCollection} 
-                className={cn(
-                  "transition-colors truncate max-w-[80px] lg:max-w-[150px]",
-                  activeCollection ? "hover:text-[#0b1912] cursor-pointer" : "opacity-30"
-                )}
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="lg:hidden p-2 -ml-2 text-slate-400 hover:text-slate-900 transition-colors"
               >
-                {activeCollection?.name || "Selectie"}
+                <Menu className="w-5 h-5" />
               </button>
-              {activeArticle && (
-                <>
-                  <span className="text-slate-200">/</span>
-                  <span className="text-[#0b1912] truncate max-w-[100px] lg:max-w-[250px]">{activeArticle.product_name}</span>
-                </>
-              )}
-            </div>
-          </div>
 
-          <div className="flex items-center gap-3 lg:gap-6">
-            <div className="hidden md:block">
-               <SaveStatus />
+              {/* Breadcrumbs V3 */}
+              <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                <button onClick={resetToCollections} className="hover:text-slate-900 transition-colors">Workspace</button>
+                <span className="text-slate-200">/</span>
+                <button 
+                  onClick={resetToCollection} 
+                  className={cn(
+                    "transition-colors truncate max-w-[150px]",
+                    activeCollection ? "hover:text-slate-900 cursor-pointer" : "opacity-30"
+                  )}
+                >
+                  {activeCollection?.name || "Collectie"}
+                </button>
+                {activeArticle && (
+                  <>
+                    <span className="text-slate-200">/</span>
+                    <span className="text-slate-900 truncate max-w-[250px] italic">
+                      {activeArticle.product_name || activeArticle.name}
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
-            <div className="hidden md:block h-4 w-[1px] bg-slate-100 mx-1" />
-            <button 
-              onClick={handleNextStep}
-              disabled={!activeArticle || activeStep === 8}
-              className="px-4 lg:px-6 py-2.5 rounded-xl bg-[#0b1912] text-[#22c981] text-[10px] font-black uppercase tracking-widest hover:bg-[#12281d] disabled:opacity-30 transition-all transform active:scale-[0.98] shadow-xl shadow-[#0b1912]/10"
-            >
-              <span className="hidden sm:inline">VOLGENDE STAP</span>
-              <span className="sm:hidden">STAP {activeStep + 1}</span>
-              <span className="ml-2">→</span>
-            </button>
+
+            <div className="flex items-center gap-4">
+              <SaveStatus />
+              <div className="h-6 w-px bg-slate-100 mx-2" />
+              <button 
+                onClick={handleNextStep}
+                disabled={!activeArticle || activeStep === 10}
+                className="h-10 px-6 rounded-xl bg-[#0b1912] text-[#22c981] text-[10px] font-black uppercase tracking-widest hover:scale-105 disabled:opacity-30 transition-all shadow-lg active:scale-95"
+              >
+                Volgende Stap →
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* WIZARD SCROLL AREA */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar">
-          <div className="max-w-4xl mx-auto p-6 lg:p-16 pb-40">
-            {form}
-          </div>
+        {/* SCROLL AREA */}
+        <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#FDFDFD]">
+          {form}
         </main>
       </div>
 

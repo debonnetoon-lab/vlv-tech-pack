@@ -12,20 +12,22 @@ import { resolveCollectionAssets } from "@/lib/pdf-utils";
 import UserManagement from "./UserManagement";
 
 export default function DataManagement() {
-  const { collections, activeCollectionId, activeArticleId, profile } = useTechPackStore();
+  const { collections, activeCollectionId, activeArticleId, profile, userRole } = useTechPackStore();
+  const isViewer = userRole === 'viewer';
+  const isAdmin = userRole === 'admin' || userRole === 'owner';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
 
-  const activeCollection = collections.find((c: any) => c.id === activeCollectionId);
+  const activeCollection = (collections || []).find((c: any) => c.id === activeCollectionId);
 
   const handleBulkPDFExport = async () => {
     if (!activeCollection) return;
     setIsGenerating(true);
     try {
       // 1. Resolve all assets for all articles in the collection
-      const resolvedArticles = await resolveCollectionAssets(activeCollection.articles);
+      const resolvedArticles = await resolveCollectionAssets(activeCollection.products);
       
       // 2. Generate the PDF blob
       const blob = await pdf(
@@ -56,7 +58,7 @@ export default function DataManagement() {
     // Collect all asset IDs from all articles across all collections
     const assetIds: string[] = [];
     for (const col of collections) {
-      for (const art of col.articles) {
+      for (const art of col.products) {
         // Check images
         for (const img of art.images || []) {
           if (img.public_url?.startsWith('asset:')) {
@@ -229,14 +231,14 @@ export default function DataManagement() {
               <div className="flex-1">
                 <h3 className="text-sm font-bold text-slate-800 tracking-tight">Bulk PDF Export</h3>
                 <p className="text-[10px] text-slate-500 mt-1">
-                  Download de volledige collectie <strong>"{activeCollection.name}"</strong> ({activeCollection.articles.length} producten) als één gecombineerd document.
+                  Download de volledige collectie <strong>"{activeCollection.name}"</strong> ({activeCollection.products.length} producten) als één gecombineerd document.
                 </p>
               </div>
             </div>
             <Button 
               onClick={handleBulkPDFExport}
-              disabled={isGenerating || activeCollection.articles.length === 0}
-              className="w-full bg-indigo-600 text-white hover:bg-indigo-700 shadow-md h-auto min-h-[40px] py-2 text-xs font-bold gap-2 transition-all"
+              disabled={isGenerating || activeCollection.products.length === 0 || isViewer}
+              className="w-full bg-indigo-600 text-white hover:bg-indigo-700 shadow-md h-auto min-h-[40px] py-2 text-xs font-bold gap-2 transition-all disabled:opacity-50"
             >
               {isGenerating ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
@@ -262,7 +264,7 @@ export default function DataManagement() {
       </div>
 
       {/* Admin Section */}
-      {profile?.email === 'toon@vivelevelo.be' && (
+      {isAdmin && (
         <div className="pt-8 border-t border-slate-100">
           <UserManagement />
         </div>
@@ -279,7 +281,8 @@ export default function DataManagement() {
             </p>
             <Button 
               variant="ghost"
-              className="text-red-600 hover:bg-red-100 hover:text-red-700 h-8 text-[10px] font-bold w-fit"
+              disabled={isViewer}
+              className="text-red-600 hover:bg-red-100 hover:text-red-700 h-8 text-[10px] font-bold w-fit disabled:opacity-50"
               onClick={() => {
                 if(confirm("Weet je zeker dat je ALLE collections wilt verwijderen? Dit kan niet ongedaan worden gemaakt.")) {
                   useDataStore.setState({ collections: [] });
@@ -288,7 +291,7 @@ export default function DataManagement() {
               }}
             >
               <Trash2 className="w-3 h-3 mr-2" />
-              Reset Alle Gegevens
+              Reset Alle Gegevens {isViewer && "(Beperkt)"}
             </Button>
          </div>
       </div>

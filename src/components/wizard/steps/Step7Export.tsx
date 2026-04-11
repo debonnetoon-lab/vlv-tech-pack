@@ -1,235 +1,196 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable react/no-unescaped-entities */
 "use client";
 
 import React from "react";
-import { TechPackArticle, Collection } from "@/types/tech-pack";
-import { Button } from "@/components/ui/button";
-import { Download, Share2, Printer, CheckCircle2, Loader2, Save, FileText } from "lucide-react";
-import { TechPackDocument } from "../../pdf/TechPackDocument";
-import { CollectionDocument } from "../../pdf/CollectionDocument";
-import {  useDataStore, useCollaborationStore , useTechPackStore } from "@/store";
-import { saveAs } from "file-saver";
+import { useTechPackStore, useUIStore } from "@/store";
+import { 
+  Download, 
+  Share2, 
+  Check, 
+  FileText, 
+  Globe,
+  Loader2,
+  ShieldCheck,
+  AlertCircle,
+  ArrowRight
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { TechPackDocument } from "@/components/pdf/TechPackDocument";
+import { motion, AnimatePresence } from "framer-motion";
+import { useTechPackValidation } from "@/hooks/useTechPackValidation";
 
-function PdfDownloadButtons({
-  resolvedArticle,
-  resolvedCollection,
-  activeCollectionName,
-  articleFileName,
-  collectionFileName,
-}: {
-  resolvedArticle: TechPackArticle;
-  resolvedCollection: unknown;
-  activeCollectionName: string;
-  articleFileName: string;
-  collectionFileName: string;
-}) {
-  const [articleLoading, setArticleLoading] = React.useState(false);
-  const [collectionLoading, setCollectionLoading] = React.useState(false);
+export default function Step7Export({ article, collectionId }: { article: any, collectionId: string }) {
+  const { createShare, logExport, organization, collections } = useTechPackStore();
+  const { setActiveStep } = useUIStore();
+  const [shareToken, setShareToken] = React.useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
 
-  // Industry-standard reliable download combining File System Access API and file-saver
-  const reliableDownload = async (blob: Blob, fileName: string) => {
-    try {
-      if ('showSaveFilePicker' in window) {
-        const handle = await (window as any).showSaveFilePicker({
-          suggestedName: fileName,
-          types: [{
-            description: 'PDF Document',
-            accept: { 'application/pdf': ['.pdf'] },
-          }],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return; // Success
-      }
-    } catch (err: any) {
-      if (err.name === 'AbortError') return; // User cancelled
-      console.error("SaveFilePicker fallback needed:", err);
-    }
-    // Fallback if API not supported or failed
-    saveAs(blob, fileName);
+  const { isValid, missingFields } = useTechPackValidation(article);
+  const activeCollection = (collections || []).find((c: any) => c.id === collectionId);
+
+  const handleCreateShare = async () => {
+    setIsGenerating(true);
+    const token = await createShare(article.id);
+    setShareToken(token);
+    setIsGenerating(false);
   };
 
-  const handleDownloadArticle = async () => {
-    setArticleLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 50)); // UI update tick
-    try {
-      const { pdf } = await import("@react-pdf/renderer");
-      const blob = await pdf(<TechPackDocument article={resolvedArticle} collectionName={activeCollectionName} />).toBlob();
-      
-      await reliableDownload(blob, articleFileName);
-    } catch (err) {
-      console.error("Fout bij genereren artikel PDF:", err);
-      alert("Er is een fout opgetreden bij het genereren van de PDF.");
-    } finally {
-      setArticleLoading(false);
-    }
-  };
-
-  const handleDownloadCollection = async () => {
-    setCollectionLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 50));
-    try {
-      const { pdf } = await import("@react-pdf/renderer");
-      const blob = await pdf(<CollectionDocument collection={resolvedCollection as Collection} />).toBlob();
-      
-      await reliableDownload(blob, collectionFileName);
-    } catch (err) {
-      console.error("Fout bij genereren collectie PDF:", err);
-      alert("Er is een fout opgetreden bij het genereren van de collectie PDF.");
-    } finally {
-      setCollectionLoading(false);
-    }
+  const copyToClipboard = () => {
+    if (!shareToken) return;
+    const url = `${window.location.origin}/share/${shareToken}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <>
-      <Button 
-        onClick={handleDownloadArticle}
-        disabled={articleLoading}
-        className={`w-full h-16 rounded-2xl font-extrabold text-lg flex items-center justify-center gap-3 transition-transform ${
-          articleLoading 
-            ? "bg-slate-800 text-slate-500 cursor-not-allowed pointer-events-none" 
-            : "bg-white text-slate-900 hover:bg-slate-100 hover:scale-[1.02]"
-        }`}
-      >
-        {articleLoading ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            PDF Maken (even geduld)...
-          </>
-        ) : (
-          <>
-            <Download className="w-5 h-5" />
-            Download Enkele Fiche
-          </>
-        )}
-      </Button>
+    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="space-y-1">
+        <h2 className="text-3xl font-black italic tracking-tighter text-slate-900 uppercase">Klaar voor Productie</h2>
+        <p className="text-slate-400 font-medium">Exporteer je tech pack of deel het direct met je leverancier.</p>
+      </div>
 
-      <div className="pt-2">
-        <div 
-          onClick={collectionLoading ? undefined : handleDownloadCollection}
-          className={`p-6 border border-slate-100 rounded-3xl flex items-center justify-between transition-colors ${
-            collectionLoading 
-              ? "bg-slate-50 opacity-50 cursor-wait" 
-              : "bg-slate-50 hover:bg-slate-100 cursor-pointer group"
-          }`}
+      {!isValid && (
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-amber-50 border border-amber-200 rounded-[32px] p-8 space-y-4"
         >
-          <div className="flex items-center gap-4">
-            {collectionLoading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
-            ) : (
-              <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-                <span className="text-xl">📦</span>
-              </div>
-            )}
-            <div>
-              <p className="text-xs font-bold text-slate-900">
-                {collectionLoading ? "Collectie wordt gegenereerd..." : "Volledige Collectie PDF"}
-              </p>
-              <p className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
-                {collectionLoading ? "Dit kan even duren..." : `Download alle fiches in ${activeCollectionName}`}
-              </p>
-            </div>
+          <div className="flex items-center gap-3 text-amber-800">
+            <AlertCircle className="w-6 h-6" />
+            <h3 className="text-lg font-black uppercase italic tracking-tight">Onvolledige Gegevens</h3>
           </div>
-          {!collectionLoading && (
-             <Button variant="ghost" className="text-xs font-bold text-slate-500 hover:text-slate-900 px-4 py-2 pointer-events-none">
-                KLIK OM TE DOWNLOADEN
-             </Button>
-          )}
-        </div>
-      </div>
-    </>
-  );
-}
-
-export default function Step7Export({ article, collectionId }: { article: TechPackArticle, collectionId: string }) {
-  const { collections, duplicateArticle, setActiveStep } = useTechPackStore();
-  const profile = useTechPackStore(state => state.profile);
-  const activeCollection = collections.find((c: any) => c.id === collectionId);
-  const [isDuplicating, setIsDuplicating] = React.useState(false);
-
-  if (!activeCollection) return null;
-
-  const canExportPDF = profile?.role !== 'input';
-
-  const sanitizeFileName = (name: string) => name.replace(/[^a-z0-9]/gi, '_').toUpperCase();
-
-  const articleFileName = `${sanitizeFileName(article.reference_code || "VLV-ARTICLE")}.pdf`;
-  const collectionFileName = `COLLECTIE_${sanitizeFileName(activeCollection.name)}.pdf`;
-
-  return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 text-slate-900">
-      <div className="space-y-2">
-        <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Klaar voor Export</h2>
-        <p className="text-slate-500">Gefeliciteerd! Je technische fiche is klaar om verstuurd te worden.</p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        <div className="p-10 border-2 border-slate-900 rounded-[2.5rem] bg-slate-900 text-white flex flex-col items-center text-center space-y-6 shadow-2xl">
-          <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center shadow-lg shadow-green-500/20">
-            <CheckCircle2 className="w-10 h-10 text-white" />
-          </div>
-          <div className="space-y-2">
-            <h3 className="text-2xl font-bold">Alles staat klaar</h3>
-            <p className="text-slate-400 text-sm max-w-[300px]">Download de PDF en stuur deze rechtstreeks naar je leverancier.</p>
-          </div>
-
-          <div className="w-full grid grid-cols-1 gap-3 pt-4">
-            {canExportPDF ? (
-              <PdfDownloadButtons
-                resolvedArticle={article}
-                resolvedCollection={activeCollection}
-                activeCollectionName={activeCollection.name}
-                articleFileName={articleFileName}
-                collectionFileName={collectionFileName}
-              />
-            ) : (
-              <div className="p-8 bg-white/5 border border-white/10 rounded-3xl text-center space-y-2">
-                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mx-auto text-white/40">
-                  <FileText className="w-5 h-5" />
+          <p className="text-sm text-amber-700/80 font-medium">
+            Je kunt dit Tech Pack nog niet exporteren. De volgende velden ontbreken of zijn ongeldig:
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {missingFields.map((f, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveStep(f.step)}
+                className="flex items-center justify-between p-4 bg-white/50 hover:bg-white rounded-2xl border border-amber-100 transition-all text-left group"
+              >
+                <div className="space-y-1">
+                  <p className="text-[10px] font-black uppercase text-amber-600 tracking-widest">Stap {f.step}</p>
+                  <p className="text-xs font-bold text-slate-900">{f.label}</p>
                 </div>
-                <p className="text-xs font-bold text-white uppercase tracking-tight">Geen Export Rechten</p>
-                <p className="text-[10px] text-white/40 leading-relaxed max-w-[200px] mx-auto">
-                  Jouw account heeft enkel 'Input' rechten. Neem contact op met Toon om PDF's te genereren.
-                </p>
-              </div>
-            )}
+                <ArrowRight className="w-4 h-4 text-amber-400 group-hover:translate-x-1 transition-transform" />
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" className="h-14 rounded-2xl border-white/20 text-white hover:bg-white/10 flex items-center justify-center gap-2">
-                <Printer className="w-4 h-4" />
-                Print
-              </Button>
-              <Button variant="outline" className="h-14 rounded-2xl border-white/20 text-white hover:bg-white/10 flex items-center justify-center gap-2">
-                <Share2 className="w-4 h-4" />
-                Delen
-              </Button>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        {/* PDF EXPORT CARD */}
+        <div className={cn(
+          "bg-white rounded-[40px] border border-slate-100 p-10 shadow-sm transition-all group flex flex-col justify-between overflow-hidden relative",
+          isValid ? "hover:shadow-xl" : "opacity-60 grayscale-[0.5]"
+        )}>
+          <div className="absolute -right-12 -top-12 w-48 h-48 bg-emerald-50 rounded-full opacity-50 group-hover:scale-110 transition-transform duration-700" />
+          
+          <div className="relative z-10">
+            <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-[#22c981] flex items-center justify-center mb-8">
+               <FileText className="w-8 h-8" />
             </div>
+            <h3 className="text-2xl font-black italic tracking-tighter text-slate-900 uppercase mb-4">Industriële PDF</h3>
+            <p className="text-sm font-medium text-slate-400 leading-relaxed mb-10">
+              Gereed voor Alfa Shirt productie. Bevat BOM, maattabellen, artwork specs en alle technische details.
+            </p>
+          </div>
+
+          <div className="relative z-10">
+            {isValid ? (
+              <PDFDownloadLink
+                document={<TechPackDocument article={article} organization={organization} collectionName={activeCollection?.name} />}
+                fileName={`TP_${article.article_code || 'WIP'}_${article.name.replace(/\s+/g, '_')}.pdf`}
+                onClick={() => logExport(article.id, 'pdf')}
+              >
+                {({ loading }) => (
+                  <button 
+                    disabled={loading}
+                    className="w-full h-14 bg-[#0b1912] text-[#22c981] rounded-2xl flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-2xl shadow-[#22c981]/10"
+                  >
+                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+                    {loading ? "Genereren..." : "Download Tech Pack"}
+                  </button>
+                )}
+              </PDFDownloadLink>
+            ) : (
+                <button 
+                  disabled
+                  className="w-full h-14 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest cursor-not-allowed"
+                >
+                  <AlertCircle className="w-5 h-5" />
+                  Bevestig gegevens eerst
+                </button>
+            )}
           </div>
         </div>
 
-        <div className="pt-4 space-y-3">
-          <Button
-            disabled={isDuplicating}
-            onClick={async () => {
-               setIsDuplicating(true);
-               await duplicateArticle(collectionId, article.id);
-               setActiveStep(1);
-               setIsDuplicating(false);
-            }}
-            className="w-full h-20 rounded-[2rem] bg-indigo-50 border-2 border-indigo-200 text-indigo-900 hover:bg-indigo-100 font-extrabold text-xl flex items-center justify-center gap-4 transition-all hover:scale-[1.02] shadow-xl shadow-indigo-500/10 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-          >
-            <div className="w-10 h-10 rounded-xl bg-indigo-500 flex items-center justify-center text-white text-xl">
-              {isDuplicating ? <Loader2 className="w-5 h-5 animate-spin" /> : "➕"}
+        {/* PUBLIC SHARE CARD */}
+        <div className="bg-slate-900 rounded-[40px] p-10 shadow-2xl flex flex-col justify-between overflow-hidden relative group">
+          <Globe className="absolute -right-12 -top-12 w-64 h-64 text-white opacity-[0.03] group-hover:rotate-12 transition-transform duration-1000" />
+          
+          <div className="relative z-10">
+            <div className="w-16 h-16 rounded-3xl bg-white/10 text-[#22c981] flex items-center justify-center mb-8">
+               <Share2 className="w-8 h-8" />
             </div>
-            <div>
-              <p className="text-left font-extrabold uppercase">Start Volgende Product</p>
-              <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-widest leading-none">Behoudt kleuren, labels & placements</p>
-            </div>
-          </Button>
+            <h3 className="text-2xl font-black italic tracking-tighter text-white uppercase mb-4">Live Sharing</h3>
+            <p className="text-sm font-medium text-white/40 leading-relaxed mb-10">
+              Deel een beveiligde, read-only versie van dit Tech Pack. De ontvanger hoeft geen account aan te maken.
+            </p>
+          </div>
+
+          <div className="relative z-10 space-y-4">
+            <AnimatePresence mode="wait">
+              {!shareToken ? (
+                <motion.button 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={handleCreateShare}
+                  disabled={isGenerating || !isValid}
+                  className={cn(
+                    "w-full h-14 rounded-2xl flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest active:scale-95 transition-all",
+                    !isValid ? "bg-white/5 text-white/20 cursor-not-allowed" : "bg-white/10 text-white hover:bg-white/20"
+                  )}
+                >
+                  {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Globe className="w-5 h-5" />}
+                  {isGenerating ? "Token Genereren..." : "Delen via Link"}
+                </motion.button>
+              ) : (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-4"
+                >
+                  <div className="flex bg-white/5 rounded-2xl p-2 border border-white/10 gap-2">
+                     <div className="flex-1 px-4 py-2 text-[10px] text-white/50 font-mono truncate items-center flex">
+                        {window.location.origin}/share/{shareToken}
+                     </div>
+                     <button 
+                       onClick={copyToClipboard}
+                       className={cn(
+                         "h-10 px-4 rounded-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all",
+                         copied ? "bg-[#22c981] text-[#0b1912]" : "bg-white text-[#0b1912]"
+                       )}
+                     >
+                       {copied ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4 animate-spin" />}
+                       {copied ? "Gecopieerd" : "Copy"}
+                     </button>
+                  </div>
+                  <p className="text-[10px] text-center text-white/30 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                     <ShieldCheck className="w-3 h-3 text-[#22c981]" /> Beveiligde link actief
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
+
       </div>
     </div>
   );
