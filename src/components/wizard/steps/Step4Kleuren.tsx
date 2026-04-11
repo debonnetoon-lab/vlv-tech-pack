@@ -185,4 +185,3 @@ export default function Step4Kleuren({ article, collectionId }: { article: any, 
     </div>
   );
 }
-}
