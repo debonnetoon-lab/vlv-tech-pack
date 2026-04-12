@@ -173,19 +173,19 @@ export const TechPackPages = ({ article, organization, collectionName }: any) =>
         <Text style={styles.sectionLabel}>{PDF_STRINGS.visualRef}</Text>
         <View style={styles.visualsGrid}>
           <View style={styles.visualBox}>
-            {images.find((img: any) => img.view === 'front')?.public_url && (
+            {images.find((img: any) => img.view === 'front')?.public_url ? (
               <Image src={images.find((img: any) => img.view === 'front').public_url} style={{ width: "90%", height: "90%", objectFit: "contain" }} />
-            )}
+            ) : null}
           </View>
           <View style={styles.visualBox}>
-            {images.find((img: any) => img.view === 'back')?.public_url && (
+            {images.find((img: any) => img.view === 'back')?.public_url ? (
               <Image src={images.find((img: any) => img.view === 'back').public_url} style={{ width: "90%", height: "90%", objectFit: "contain" }} />
-            )}
+            ) : null}
           </View>
           <View style={styles.artworkBox}>
-            {images.find((img: any) => img.view === 'artwork')?.public_url && (
+            {images.find((img: any) => img.view === 'artwork')?.public_url ? (
               <Image src={images.find((img: any) => img.view === 'artwork').public_url} style={{ width: "90%", height: "90%", objectFit: "contain" }} />
-            )}
+            ) : null}
             <View style={styles.artworkSpecBottom}>
               <Text style={styles.artworkSpecTitle}>SKETCH / REF</Text>
               <Text style={styles.artworkSpecDesc}>{PDF_STRINGS.garmentType}: {safeText(article.garment_type, "Standard")}</Text>

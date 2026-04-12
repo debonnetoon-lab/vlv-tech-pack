@@ -420,11 +420,18 @@ export const useDataStore = create<DataStore>()(
           isSaving: true,
         }));
 
-        const { bom_items, materials, colorways, placements, measurement_points, ...baseFields } = updates as any; // Cast added to safely destruct remaining fields
+        const { bom_items, materials, colorways, placements, measurement_points, sizes, ...baseFields } = updates as any; // Cast added to safely destruct remaining fields
 
         try {
           if (Object.keys(baseFields).length > 0) {
             await supabase.from('products').update(baseFields).eq('id', productId);
+          }
+
+          if (sizes !== undefined) {
+             await supabase.from('size_charts').delete().eq('product_id', productId);
+             if (sizes.length > 0) {
+               await supabase.from('size_charts').insert([{ product_id: productId, sizes: sizes }]);
+             }
           }
 
           if (bom_items && bom_items.length > 0) {
