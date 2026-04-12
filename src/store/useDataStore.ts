@@ -151,32 +151,33 @@ export const useDataStore = create<DataStore>()(
           if (!rpcError && data) {
             orgId = data;
           } else {
-            // Fallback: Check organization_members
-            const { data: mem } = await supabase
+            // Fallback: Check organization_members without .single() to avoid PGRST116 errors on multiple rows
+            const { data: mems } = await supabase
               .from('organization_members')
               .select('organization_id')
               .eq('user_id', user.id)
-              .limit(1)
-              .single();
-            if (mem) orgId = mem.organization_id;
+              .limit(1);
+            if (mems && mems.length > 0) {
+              orgId = mems[0].organization_id;
+            }
           }
         }
 
         if (orgId) {
           set({ organizationId: orgId });
-          // Also fetch the full organization object
-          const { data: org } = await supabase.from('organizations').select('*').eq('id', orgId).single();
-          if (org) set({ organization: org });
+          // Also fetch the full organization object (avoiding single just in case)
+          const { data: orgs } = await supabase.from('organizations').select('*').eq('id', orgId).limit(1);
+          if (orgs && orgs.length > 0) set({ organization: orgs[0] });
 
-          // [NEW] Fetch user role for this org
-          const { data: mem } = await supabase
+          // Fetch user role for this org (avoiding single)
+          const { data: mems } = await supabase
             .from('organization_members')
             .select('role')
             .eq('organization_id', orgId)
             .eq('user_id', user.id)
-            .single();
+            .limit(1);
           
-          if (mem) set({ userRole: mem.role as any });
+          if (mems && mems.length > 0) set({ userRole: mems[0].role as any });
         }
 
         // ── STEP 2: Load profile into collaboration store ──
@@ -245,6 +246,16 @@ export const useDataStore = create<DataStore>()(
           })) as unknown as Collection[];
 
           set({ collections: mappedCollections });
+
+          // ── EMERGENCY FALLBACK: If org is still null but we HAVE collections, infer orgId from collection ──
+          if (!getData().organization && mappedCollections.length > 0) {
+            const inferredOrgId = mappedCollections[0].organization_id;
+            if (inferredOrgId) {
+              set({ organizationId: inferredOrgId });
+              const { data: orgs } = await supabase.from('organizations').select('*').eq('id', inferredOrgId).limit(1);
+              if (orgs && orgs.length > 0) set({ organization: orgs[0] });
+            }
+          }
 
           const uiStore = useUIStore.getState();
           if (!uiStore.activeCollectionId && mappedCollections.length > 0) {
