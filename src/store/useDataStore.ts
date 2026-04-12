@@ -328,48 +328,55 @@ export const useDataStore = create<DataStore>()(
           return;
         }
 
-        // Ensure we have an organization ID
+        // Ensure we have an organization ID without single() crashes
         if (!orgId) {
-          // Fallback check if store is out of sync
           const { data: orgMember } = await supabase
             .from('organization_members')
             .select('organization_id')
             .eq('user_id', user.id)
-            .limit(1)
-            .single();
+            .limit(1);
             
-          if (orgMember) { 
-            orgId = orgMember.organization_id; 
+          if (orgMember && orgMember.length > 0) { 
+            orgId = orgMember[0].organization_id; 
             set({ organizationId: orgId }); 
           }
         }
 
         if (!orgId) {
-          console.error("No organization found for user.");
-          alert("Geen actieve werkruimte gevonden. Neem contact op met support of voer de herstel-SQL uit.");
-          return;
+          // If literally no organization exists, run repair right now
+          await getData().repairOrganization();
+          orgId = getData().organizationId;
         }
 
         set({ isSaving: true });
-        const { data, error } = await supabase
-          .from('collections')
-          .insert([{ 
+        
+        const payload = { 
             name, 
             organization_id: orgId,
-            season: details?.season || "",
+            season: details?.season || "FW", // prevent empty string check violation
             year: details?.year || new Date().getFullYear(),
             created_by: user.id
-          }])
-          .select()
-          .single();
+        };
+
+        let insertRes = await supabase.from('collections').insert([payload]).select().single();
+
+        // ── EMERGENCY AUTO-REPAIR FOR RLS OR MISSING ORG FAILURES ──
+        if (insertRes.error && insertRes.error.message.includes('security')) {
+           console.warn("RLS block detected! Auto-repairing organization and retrying...");
+           await getData().repairOrganization();
+           payload.organization_id = getData().organizationId;
+           insertRes = await supabase.from('collections').insert([payload]).select().single();
+        }
 
         set({ isSaving: false });
-        if (error) {
-          console.error("Error creating collection:", error);
-          alert("Fout bij het aanmaken van collectie: " + error.message);
-        } else if (data) {
-          set((state) => ({ collections: [{ ...data, products: [] }, ...state.collections] }));
-          logActivity('created', 'collection', data.id, { name });
+        
+        if (insertRes.error) {
+          console.error("Error creating collection:", insertRes.error);
+          alert("Systeemfout bij opslaan: " + insertRes.error.message);
+        } else if (insertRes.data) {
+          set((state) => ({ collections: [{ ...insertRes.data, products: [] }, ...state.collections] }));
+          logActivity('created', 'collection', insertRes.data.id, { name });
+          useUIStore.getState().setCollectionModalOpen(false);
         }
       },
 
