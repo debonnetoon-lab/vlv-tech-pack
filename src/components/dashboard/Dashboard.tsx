@@ -32,6 +32,7 @@ export default function Dashboard() {
     addProduct,
     fetchCollections,
     organization,
+    organizationId,
     repairOrganization,
     isSaving
   } = useTechPackStore();
@@ -139,7 +140,7 @@ export default function Dashboard() {
           </div>
 
           <AnimatePresence mode="popLayout">
-            {!organization ? (
+            {(!organization && !organizationId && collections.length === 0) ? (
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
