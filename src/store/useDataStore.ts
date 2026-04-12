@@ -646,48 +646,14 @@ export const useDataStore = create<DataStore>()(
         let fileToUpload: File | Blob = file;
         let fileExt = file.name.split('.').pop()?.toLowerCase() || '';
 
-        // Safely timeout wrapper
-        const withTimeout = (promise: Promise<any>, timeoutMs: number, label: string) => {
-          let timeoutHandle: NodeJS.Timeout;
-          const timeoutPromise = new Promise((_, reject) => {
-            timeoutHandle = setTimeout(() => reject(new Error(`Timeout: ${label} nam te veel tijd in beslag.`)), timeoutMs);
-          });
-          return Promise.race([
-            promise.then(res => { clearTimeout(timeoutHandle); return res; }).catch(err => { clearTimeout(timeoutHandle); throw err; }),
-            timeoutPromise
-          ]);
-        };
-
-        if (file.type.startsWith('image/')) {
-          set({ uploadProgress: 10 });
-          const isPng = file.type === 'image/png';
-          try {
-            const options = {
-              maxSizeMB: 2,
-              maxWidthOrHeight: 2500,
-              useWebWorker: false, 
-              fileType: isPng ? "image/png" : "image/jpeg",
-            };
-            const compressedBlob = await withTimeout(imageCompression(file, options), 10000, "Afbeelding compressie");
-            fileToUpload = compressedBlob as Blob;
-            fileExt = isPng ? "png" : "jpg";
-          } catch (error: any) {
-            console.error("Compression failed:", error);
-            // alert(`Achtergrond compressie gefaald: ${error.message}. We proberen origineel...`);
-            fileToUpload = file;
-          }
-        }
-
         const fileName = `${productId}/${view}_${Date.now()}.${fileExt}`;
         set({ uploadProgress: 90 });
 
         try {
-          const uploadPromise = supabase.storage.from('tech-pack-assets').upload(fileName, fileToUpload, {
+          const { data: uploadData, error: uploadErr } = await supabase.storage.from('tech-pack-assets').upload(fileName, fileToUpload, {
              cacheControl: '3600',
              upsert: false
           });
-          
-          const { data: uploadData, error: uploadErr } = (await withTimeout(uploadPromise, 15000, "Supabase Server Upload")) as any;
 
           if (uploadErr || !uploadData) {
             set({ uploadProgress: 0 });
