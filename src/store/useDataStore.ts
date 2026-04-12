@@ -659,17 +659,13 @@ export const useDataStore = create<DataStore>()(
             const options = {
               maxSizeMB: 2,
               maxWidthOrHeight: 2500,
-              useWebWorker: true,
+              useWebWorker: false, // Critical fix: avoids silent infinite hangs on Safari!
               fileType: isPng ? "image/png" : "image/jpeg",
               onProgress: (p: number) => set({ uploadProgress: 10 + (p * 0.8) })
             };
             
-            const compressedBlob = await imageCompression(file, options);
-            // Reconstruct File object safely
-            fileToUpload = new File([compressedBlob], file.name, {
-              type: compressedBlob.type,
-              lastModified: Date.now(),
-            });
+            // Returns a File object natively, flawlessly bypassing New File() polyfill crashes on WebKit
+            fileToUpload = await imageCompression(file, options);
             fileExt = isPng ? "png" : "jpg";
           } catch (error) {
             console.error("Compression / metadata strip failed, uploading original:", error);
