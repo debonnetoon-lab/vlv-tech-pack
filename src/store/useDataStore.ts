@@ -641,64 +641,81 @@ export const useDataStore = create<DataStore>()(
       },
 
       uploadProductImage: async (productId: string, file: File, view: ProductImage['view']) => {
-        // Validation: Limit raw file size to 15MB before even attempting compression
-        if (file.size > 15 * 1024 * 1024) {
-          throw new Error("Bestand is te groot (max 15MB).");
-        }
+        if (file.size > 15 * 1024 * 1024) throw new Error("Bestand is te groot (max 15MB).");
 
-        let fileToUpload = file;
+        let fileToUpload: File | Blob = file;
         let fileExt = file.name.split('.').pop()?.toLowerCase() || '';
 
-        // Leverage robust browser-image-compression logic that handles EXIF & strips bad Apple/Adobe metadata
+        // Safely timeout wrapper
+        const withTimeout = (promise: Promise<any>, timeoutMs: number, label: string) => {
+          let timeoutHandle: NodeJS.Timeout;
+          const timeoutPromise = new Promise((_, reject) => {
+            timeoutHandle = setTimeout(() => reject(new Error(`Timeout: ${label} nam te veel tijd in beslag.`)), timeoutMs);
+          });
+          return Promise.race([
+            promise.then(res => { clearTimeout(timeoutHandle); return res; }).catch(err => { clearTimeout(timeoutHandle); throw err; }),
+            timeoutPromise
+          ]);
+        };
+
         if (file.type.startsWith('image/')) {
           set({ uploadProgress: 10 });
           const isPng = file.type === 'image/png';
-          
           try {
-            // By passing it through compression, we strip the interlaced metadata that crashes @react-pdf/renderer
             const options = {
               maxSizeMB: 2,
               maxWidthOrHeight: 2500,
-              useWebWorker: false, // Critical fix: avoids silent infinite hangs on Safari!
+              useWebWorker: false, 
               fileType: isPng ? "image/png" : "image/jpeg",
-              onProgress: (p: number) => set({ uploadProgress: 10 + (p * 0.8) })
             };
-            
-            // Returns a File object natively, flawlessly bypassing New File() polyfill crashes on WebKit
-            fileToUpload = await imageCompression(file, options);
+            const compressedBlob = await withTimeout(imageCompression(file, options), 10000, "Afbeelding compressie");
+            fileToUpload = compressedBlob as Blob;
             fileExt = isPng ? "png" : "jpg";
-          } catch (error) {
-            console.error("Compression / metadata strip failed, uploading original:", error);
-            fileToUpload = file; // fallback
+          } catch (error: any) {
+            console.error("Compression failed:", error);
+            // alert(`Achtergrond compressie gefaald: ${error.message}. We proberen origineel...`);
+            fileToUpload = file;
           }
         }
 
         const fileName = `${productId}/${view}_${Date.now()}.${fileExt}`;
-        
         set({ uploadProgress: 90 });
-        const { data: uploadData, error: uploadErr } = await supabase.storage.from('tech-pack-assets').upload(fileName, fileToUpload);
-        
-        if (uploadErr || !uploadData) {
-          set({ uploadProgress: 0 });
-          throw new Error("Upload failed: " + uploadErr?.message);
+
+        try {
+          const uploadPromise = supabase.storage.from('tech-pack-assets').upload(fileName, fileToUpload, {
+             cacheControl: '3600',
+             upsert: false
+          });
+          
+          const { data: uploadData, error: uploadErr } = (await withTimeout(uploadPromise, 15000, "Supabase Server Upload")) as any;
+
+          if (uploadErr || !uploadData) {
+            set({ uploadProgress: 0 });
+            throw new Error(uploadErr?.message || "Upload afgewezen door netwerk of rechten.");
+          }
+
+          const { data: { publicUrl } } = supabase.storage.from('tech-pack-assets').getPublicUrl(uploadData.path);
+          
+          const { error: dbErr } = await supabase.from('product_files').insert([{
+            product_id: productId,
+            file_type: view === 'artwork' ? 'other' : 'technical_sketch',
+            file_url: uploadData.path,
+            public_url: publicUrl,
+            view,
+            file_name: file.name
+          }]);
+
+          set({ uploadProgress: 100 });
+          setTimeout(() => set({ uploadProgress: 0 }), 1000);
+
+          if (dbErr) throw dbErr;
+          return publicUrl;
+          
+        } catch (error: any) {
+           set({ uploadProgress: 0 });
+           alert(`Upload hard onderbroken: ${error.message}. Je bent mogelijk offline of er is een opslagprobleem.`);
+           throw error;
         }
-
-        const { data: { publicUrl } } = supabase.storage.from('tech-pack-assets').getPublicUrl(uploadData.path);
-        
-        const { error: dbErr } = await supabase.from('product_files').insert([{
-          product_id: productId,
-          file_type: view === 'artwork' ? 'other' : 'technical_sketch',
-          file_url: uploadData.path,
-          public_url: publicUrl,
-          view,
-          file_name: file.name
-        }]);
-
-        set({ uploadProgress: 100 });
-        setTimeout(() => set({ uploadProgress: 0 }), 1000);
-
-        if (dbErr) throw dbErr;
-        return publicUrl;
       }
     }),
     {
