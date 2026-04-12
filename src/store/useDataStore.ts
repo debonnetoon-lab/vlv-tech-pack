@@ -647,24 +647,53 @@ export const useDataStore = create<DataStore>()(
         }
 
         let fileToUpload = file;
-        
-        // Compression for images
+        let fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+
+        // Safe conversion to JPEG to prevent @react-pdf/renderer crashing on PNG/WebP alpha layers
         if (file.type.startsWith('image/')) {
-          set({ uploadProgress: 10 });
-          const options = {
-            maxSizeMB: 2,
-            maxWidthOrHeight: 2000,
-            useWebWorker: true,
-            onProgress: (p: number) => set({ uploadProgress: 10 + (p * 0.8) })
-          };
-          try {
-            fileToUpload = await imageCompression(file, options);
-          } catch (error) {
-            console.error("Compression failed, uploading original:", error);
-          }
+           set({ uploadProgress: 10 });
+           try {
+             fileToUpload = await new Promise<File>((resolve) => {
+               const img = new window.Image();
+               const objectUrl = URL.createObjectURL(file);
+               img.onload = () => {
+                 const canvas = document.createElement('canvas');
+                 let width = img.width;
+                 let height = img.height;
+                 const MAX_SIZE = 2500;
+                 if (width > MAX_SIZE || height > MAX_SIZE) {
+                   const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+                   width = width * ratio;
+                   height = height * ratio;
+                 }
+                 canvas.width = width;
+                 canvas.height = height;
+                 const ctx = canvas.getContext('2d');
+                 if (ctx) {
+                   ctx.fillStyle = '#FFFFFF';
+                   ctx.fillRect(0, 0, width, height);
+                   ctx.drawImage(img, 0, 0, width, height);
+                   canvas.toBlob((blob) => {
+                     URL.revokeObjectURL(objectUrl);
+                     if (blob) {
+                       resolve(new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), { type: "image/jpeg" }));
+                     } else {
+                       resolve(file);
+                     }
+                   }, 'image/jpeg', 0.85);
+                 } else {
+                   resolve(file);
+                 }
+               };
+               img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+               img.src = objectUrl;
+             });
+             fileExt = 'jpg';
+           } catch(e) {
+             console.warn("Canvas conversion failed, using original file", e);
+           }
         }
 
-        const fileExt = file.name.split('.').pop();
         const fileName = `${productId}/${view}_${Date.now()}.${fileExt}`;
         
         set({ uploadProgress: 90 });
