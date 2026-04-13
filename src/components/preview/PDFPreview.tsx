@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { TechPackDocument } from "../pdf/TechPackDocument";
 import { saveAs } from "file-saver";
 import { pdf } from "@react-pdf/renderer";
+import { PDFErrorBoundary } from "../pdf/PDFErrorBoundary";
 
 export default function PDFPreview() {
   const { collections, activeCollectionId, activeArticleId } = useTechPackStore();
@@ -64,35 +65,37 @@ export default function PDFPreview() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-800">
-      <div className="p-4 bg-slate-900 border-b border-white/5 flex items-center justify-between">
-         <span className="text-white text-[11px] font-bold tracking-widest uppercase">Live PDF Preview</span>
-         <button 
-            onClick={handleDownload}
-            disabled={isDownloading || !pdfUrl}
-            className="px-3 py-1.5 bg-[#22c981] text-[#0b1912] rounded-lg text-[10px] font-black uppercase hover:scale-105 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
-         >
-            {isDownloading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-            Download PDF
-         </button>
-      </div>
-      
-      <div className="flex-1 overflow-hidden bg-slate-500 relative">
-        {pdfUrl ? (
-          <iframe 
-            src={`${pdfUrl}#view=FitH`} 
-            className="w-full h-full border-none"
-            title="PDF Voorvertoning"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-2 text-white/50">
-              <Loader2 className="w-8 h-8 animate-spin" />
-              <span className="text-xs font-bold uppercase tracking-widest">Gereedmaken...</span>
+    <PDFErrorBoundary>
+      <div className="flex-1 flex flex-col h-full bg-slate-800">
+        <div className="p-4 bg-slate-900 border-b border-white/5 flex items-center justify-between">
+           <span className="text-white text-[11px] font-bold tracking-widest uppercase">Live PDF Preview</span>
+           <button 
+              onClick={handleDownload}
+              disabled={isDownloading || !pdfUrl}
+              className="px-3 py-1.5 bg-[#22c981] text-[#0b1912] rounded-lg text-[10px] font-black uppercase hover:scale-105 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50"
+           >
+              {isDownloading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+              Download PDF
+           </button>
+        </div>
+        
+        <div className="flex-1 overflow-hidden bg-slate-500 relative">
+          {pdfUrl ? (
+            <iframe 
+              src={`${pdfUrl}#view=FitH`} 
+              className="w-full h-full border-none"
+              title="PDF Voorvertoning"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-2 text-white/50">
+                <Loader2 className="w-8 h-8 animate-spin" />
+                <span className="text-xs font-bold uppercase tracking-widest">Gereedmaken...</span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </PDFErrorBoundary>
   );
 }

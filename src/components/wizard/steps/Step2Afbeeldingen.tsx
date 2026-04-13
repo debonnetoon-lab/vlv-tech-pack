@@ -99,17 +99,11 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
     }
   };
 
-  const removeImage = async (imageId: string) => {
+  const removeImage = async (image: ProductImage) => {
     if (isViewer) return;
-    setIsDeleting(imageId);
+    setIsDeleting(image.id);
     try {
-      const { error } = await supabase.from('product_files').delete().eq('id', imageId);
-      if (error) {
-         console.error("Delete failed:", error);
-         alert("De afbeelding kon niet worden verwijderd.");
-      } else {
-         await useDataStore.getState().fetchCollections();
-      }
+      await useDataStore.getState().removeProductFile(image.id, image.file_url);
     } catch (err) {
       console.error(err);
     } finally {
@@ -186,7 +180,7 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
                          onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            if (image?.id) removeImage(image.id);
+                            if (image) removeImage(image);
                          }}
                          className="p-4 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all shadow-2xl disabled:opacity-50 hover:scale-110 active:scale-95"
                        >

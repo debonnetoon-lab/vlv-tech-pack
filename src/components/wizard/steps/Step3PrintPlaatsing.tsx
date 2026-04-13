@@ -108,9 +108,16 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
     }
   };
 
-  const removePlacement = (index: number) => {
+  const removePlacement = async (index: number) => {
     if (isViewer) return;
     const currentPlacements = article.placements || [];
+    const placementToDelete = currentPlacements[index];
+    
+    // Clean up storage if artwork exists
+    if (placementToDelete?.artwork_url) {
+      await useDataStore.getState().deleteFileByUrl(placementToDelete.artwork_url);
+    }
+
     updateProduct(collectionId, article.id, {
       placements: currentPlacements.filter((_, i) => i !== index)
     });
@@ -125,23 +132,20 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
 
     setUploadingIndex(index);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${article.id}/placement_${index}_${Date.now()}.${fileExt}`;
+      const oldArtworkUrl = article.placements?.[index]?.artwork_url;
       
-      const { data, error: uploadError } = await supabase.storage
-        .from('tech-pack-assets')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('tech-pack-assets')
-        .getPublicUrl(data.path);
-
-      updatePlacement(index, { artwork_url: publicUrl });
-    } catch (err) {
+      const publicUrl = await useDataStore.getState().uploadPlacementArtwork(article.id, file, index);
+      
+      if (publicUrl) {
+        // Cleanup old artwork if it exists
+        if (oldArtworkUrl) {
+          await useDataStore.getState().deleteFileByUrl(oldArtworkUrl);
+        }
+        updatePlacement(index, { artwork_url: publicUrl });
+      }
+    } catch (err: any) {
       console.error("Placement artwork upload failed:", err);
-      alert("Fout bij uploaden artwork mockup.");
+      alert("Fout bij uploaden artwork: " + (err.message || "Onbekende fout."));
     } finally {
       setUploadingIndex(null);
     }

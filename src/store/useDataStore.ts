@@ -64,6 +64,9 @@ interface DataStore {
   duplicateProduct: (collectionId: string, productId: string) => Promise<void>;
   uploadProgress: number;
   uploadProductImage: (productId: string, file: File, view: ProductImage['view']) => Promise<string>;
+  uploadPlacementArtwork: (productId: string, file: File, index: number) => Promise<string>;
+  removeProductFile: (fileId: string, storagePath: string) => Promise<void>;
+  deleteFileByUrl: (url: string) => Promise<void>;
 }
 
 export const useDataStore = create<DataStore>()(
@@ -641,67 +644,10 @@ export const useDataStore = create<DataStore>()(
       },
 
       uploadProductImage: async (productId: string, file: File, view: ProductImage['view']) => {
-        set({ uploadProgress: 10 });
-        let fileToUpload: Blob = file;
-        let fileExt = 'jpg'; // We hard-override all images to JPG for PDF safety!
-
-        if (file.type.startsWith('image/')) {
-          try {
-            fileToUpload = await new Promise<Blob>((resolve, reject) => {
-              const img = new window.Image();
-              const objectUrl = URL.createObjectURL(file);
-              
-              img.onload = () => {
-                try {
-                  const canvas = document.createElement('canvas');
-                  let width = img.width;
-                  let height = img.height;
-                  
-                  // Downscale to max 2000px
-                  const MAX_SIZE = 2000;
-                  if (width > MAX_SIZE || height > MAX_SIZE) {
-                    const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
-                    width = width * ratio;
-                    height = height * ratio;
-                  }
-                  
-                  canvas.width = width;
-                  canvas.height = height;
-                  const ctx = canvas.getContext('2d');
-                  if (!ctx) throw new Error("Canvas 2D failed");
-                  
-                  // Fill with white background to squash PNG transparency
-                  ctx.fillStyle = '#FFFFFF';
-                  ctx.fillRect(0, 0, width, height);
-                  ctx.drawImage(img, 0, 0, width, height);
-                  
-                  set({ uploadProgress: 50 });
-                  canvas.toBlob((blob) => {
-                    URL.revokeObjectURL(objectUrl);
-                    if (blob) resolve(blob);
-                    else reject(new Error("Canvas export failed"));
-                  }, 'image/jpeg', 0.85);
-                } catch(err) {
-                  URL.revokeObjectURL(objectUrl);
-                  reject(err);
-                }
-              };
-              img.onerror = () => {
-                URL.revokeObjectURL(objectUrl);
-                reject(new Error("Corrupt image"));
-              };
-              img.src = objectUrl;
-            });
-          } catch (e: any) {
-            console.error("Canvas force-jpeg failed:", e);
-            throw new Error(`Upload aborted: kon afbeelding niet omzetten naar JPG. ${e.message}`);
-          }
-        } else {
-           fileExt = file.name.split('.').pop() || 'tmp';
-        }
+        const { prepareImageForUpload } = getDataHelpers();
+        const { fileToUpload, fileExt } = await prepareImageForUpload(file);
 
         const fileName = `${productId}/${view}_${Date.now()}.${fileExt}`;
-        
         set({ uploadProgress: 90 });
         const { data: uploadData, error: uploadErr } = await supabase.storage.from('tech-pack-assets').upload(fileName, fileToUpload);
         
@@ -726,6 +672,54 @@ export const useDataStore = create<DataStore>()(
 
         if (dbErr) throw dbErr;
         return publicUrl;
+      },
+
+      uploadPlacementArtwork: async (productId: string, file: File, index: number) => {
+        const { prepareImageForUpload } = getDataHelpers();
+        const { fileToUpload, fileExt } = await prepareImageForUpload(file);
+
+        const fileName = `${productId}/placement_${index}_${Date.now()}.${fileExt}`;
+        set({ uploadProgress: 90 });
+        const { data: uploadData, error: uploadErr } = await supabase.storage.from('tech-pack-assets').upload(fileName, fileToUpload);
+        
+        if (uploadErr || !uploadData) {
+          set({ uploadProgress: 0 });
+          throw new Error("Placement upload failed: " + uploadErr?.message);
+        }
+
+        const { data: { publicUrl } } = supabase.storage.from('tech-pack-assets').getPublicUrl(uploadData.path);
+        set({ uploadProgress: 100 });
+        setTimeout(() => set({ uploadProgress: 0 }), 1000);
+        
+        return publicUrl;
+      },
+
+      removeProductFile: async (fileId: string, storagePath: string) => {
+        const { fetchCollections } = getData();
+        set({ isSaving: true });
+        try {
+          // 1. Delete from Storage
+          await supabase.storage.from('tech-pack-assets').remove([storagePath]);
+          
+          // 2. Delete from DB
+          const { error } = await supabase.from('product_files').delete().eq('id', fileId);
+          if (error) throw error;
+
+          await fetchCollections();
+        } catch (err: any) {
+          console.error("Cleanup failed:", err);
+          alert("Bestand kon niet volledig verwijderd worden: " + err.message);
+        } finally {
+          set({ isSaving: false });
+        }
+      },
+
+      deleteFileByUrl: async (url: string) => {
+        if (!url || !url.includes('/storage/v1/object/public/tech-pack-assets/')) return;
+        const path = url.split('/storage/v1/object/public/tech-pack-assets/')[1];
+        if (path) {
+          await supabase.storage.from('tech-pack-assets').remove([path]);
+        }
       }
     }),
     {
@@ -734,3 +728,57 @@ export const useDataStore = create<DataStore>()(
     }
   )
 );
+
+/**
+ * INTERNAL HELPERS FOR DATA PROCESSING
+ */
+const getDataHelpers = () => ({
+  prepareImageForUpload: async (file: File): Promise<{ fileToUpload: Blob, fileExt: string }> => {
+    if (!file.type.startsWith('image/')) {
+      return { fileToUpload: file, fileExt: file.name.split('.').pop() || 'tmp' };
+    }
+
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
+      const objectUrl = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          const MAX_SIZE = 2000;
+          if (width > MAX_SIZE || height > MAX_SIZE) {
+            const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+            width = width * ratio;
+            height = height * ratio;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error("Canvas 2D failed");
+          
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob((blob) => {
+            URL.revokeObjectURL(objectUrl);
+            if (blob) resolve({ fileToUpload: blob, fileExt: 'jpg' });
+            else reject(new Error("Canvas export failed"));
+          }, 'image/jpeg', 0.85);
+        } catch(err) {
+          URL.revokeObjectURL(objectUrl);
+          reject(err);
+        }
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Corrupt image"));
+      };
+      img.src = objectUrl;
+    });
+  }
+});
