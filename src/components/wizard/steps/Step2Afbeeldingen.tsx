@@ -120,9 +120,14 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
       <div className="space-y-2">
         <h2 className="text-3xl font-extrabold tracking-tight italic uppercase tracking-tighter">Voeg afbeeldingen toe</h2>
         <p className="text-slate-500 font-medium">Sleep bestanden naar de juiste zone of klik om te bladeren.</p>
-        <div className="text-[10px] text-orange-600 font-black uppercase tracking-widest bg-orange-50 p-4 rounded-[20px] border border-orange-200 flex items-center gap-3">
-           <AlertCircle className="w-5 h-5 text-orange-500" />
-           LET OP: Upload hier de uiteindelijke preview als PNG of JPG voor de PDF generatie. Het ruwe .AI ontwerpbestand voeg je apart bij in de mail naar de fabrikant.
+        <div className="flex flex-col gap-2">
+          <div className="text-[10px] text-orange-600 font-black uppercase tracking-widest bg-orange-50 p-4 rounded-[20px] border border-orange-200 flex items-start gap-3">
+             <AlertCircle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
+             <div>
+               LET OP: Upload hier de uiteindelijke werkbare preview als PNG of JPG voor de PDF generatie.<br/>
+               <span className="text-red-500">Om crashes te voorkomen: zorg dat de afmetingen niet groter zijn dan +/- 2500 pixels breed (max 15MB).</span> Het ruwe gigantische .AI bronbestand voeg je apart bij in je mail.
+             </div>
+          </div>
         </div>
       </div>
 

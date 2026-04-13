@@ -641,47 +641,51 @@ export const useDataStore = create<DataStore>()(
       },
 
       uploadProductImage: async (productId: string, file: File, view: ProductImage['view']) => {
-        if (file.size > 15 * 1024 * 1024) throw new Error("Bestand is te groot (max 15MB).");
-
-        let fileToUpload: File | Blob = file;
-        let fileExt = file.name.split('.').pop()?.toLowerCase() || '';
-
-        const fileName = `${productId}/${view}_${Date.now()}.${fileExt}`;
-        set({ uploadProgress: 90 });
-
-        try {
-          const { data: uploadData, error: uploadErr } = await supabase.storage.from('tech-pack-assets').upload(fileName, fileToUpload, {
-             cacheControl: '3600',
-             upsert: false
-          });
-
-          if (uploadErr || !uploadData) {
-            set({ uploadProgress: 0 });
-            throw new Error(uploadErr?.message || "Upload afgewezen door netwerk of rechten.");
+        let fileToUpload = file;
+        
+        // Compression for images
+        if (file.type.startsWith('image/')) {
+          set({ uploadProgress: 10 });
+          const options = {
+            maxSizeMB: 2,
+            maxWidthOrHeight: 2000,
+            useWebWorker: true,
+            onProgress: (p: number) => set({ uploadProgress: 10 + (p * 0.8) })
+          };
+          try {
+            fileToUpload = await imageCompression(file, options);
+          } catch (error) {
+            console.error("Compression failed, uploading original:", error);
           }
-
-          const { data: { publicUrl } } = supabase.storage.from('tech-pack-assets').getPublicUrl(uploadData.path);
-          
-          const { error: dbErr } = await supabase.from('product_files').insert([{
-            product_id: productId,
-            file_type: view === 'artwork' ? 'other' : 'technical_sketch',
-            file_url: uploadData.path,
-            public_url: publicUrl,
-            view,
-            file_name: file.name
-          }]);
-
-          set({ uploadProgress: 100 });
-          setTimeout(() => set({ uploadProgress: 0 }), 1000);
-
-          if (dbErr) throw dbErr;
-          return publicUrl;
-          
-        } catch (error: any) {
-           set({ uploadProgress: 0 });
-           alert(`Upload hard onderbroken: ${error.message}. Je bent mogelijk offline of er is een opslagprobleem.`);
-           throw error;
         }
+
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${productId}/${view}_${Date.now()}.${fileExt}`;
+        
+        set({ uploadProgress: 90 });
+        const { data: uploadData, error: uploadErr } = await supabase.storage.from('tech-pack-assets').upload(fileName, fileToUpload);
+        
+        if (uploadErr || !uploadData) {
+          set({ uploadProgress: 0 });
+          throw new Error("Upload failed: " + uploadErr?.message);
+        }
+
+        const { data: { publicUrl } } = supabase.storage.from('tech-pack-assets').getPublicUrl(uploadData.path);
+        
+        const { error: dbErr } = await supabase.from('product_files').insert([{
+          product_id: productId,
+          file_type: view === 'artwork' ? 'other' : 'technical_sketch',
+          file_url: uploadData.path,
+          public_url: publicUrl,
+          view,
+          file_name: file.name
+        }]);
+
+        set({ uploadProgress: 100 });
+        setTimeout(() => set({ uploadProgress: 0 }), 1000);
+
+        if (dbErr) throw dbErr;
+        return publicUrl;
       }
     }),
     {
