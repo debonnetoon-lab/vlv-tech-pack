@@ -148,7 +148,7 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
   };
 
   const applyAIMeasurement = () => {
-    if (isViewer || !article.ai_measurement) return;
+    if (isViewer || !article.ai_measurement?.print) return;
     
     const { width_cm, height_cm, pos_under_neck_cm, technique } = article.ai_measurement.print;
     
@@ -179,7 +179,7 @@ export default function Step3PrintPlaatsing({ article, collectionId }: { article
         <h2 className="text-3xl font-extrabold tracking-tight italic uppercase tracking-tighter">Print & Plaatsing</h2>
         <p className="text-slate-500 font-medium">Geef aan waar de bedrukking of borduring moet komen.</p>
         
-        {article.ai_measurement && (
+        {article.ai_measurement?.print && (
            <div className="mt-4 p-4 bg-orange-50 border border-orange-100 rounded-[24px] flex items-center justify-between animate-in slide-in-from-left-4 duration-500">
               <div className="flex items-center gap-4">
                  <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center shadow-sm">

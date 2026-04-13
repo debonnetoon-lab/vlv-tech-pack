@@ -27,6 +27,7 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
   const [isDeleting, setIsDeleting] = React.useState<string | null>(null);
   const [dragOverZone, setDragOverZone] = React.useState<string | null>(null);
   const [localPreviews, setLocalPreviews] = React.useState<Record<string, string>>({});
+  const [uploadErrorMsg, setUploadErrorMsg] = React.useState<string | null>(null);
 
   const getError = (field: string) => {
     return missingFields.find(f => f.step === 2 && f.field === field);
@@ -78,6 +79,7 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
     setLocalPreviews(prev => ({ ...prev, [view]: objectUrl }));
 
     setIsUploading(view);
+    setUploadErrorMsg(null);
     try {
       const publicUrl = await uploadProductImage(article.id, file, view);
       if (publicUrl) {
@@ -90,7 +92,7 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
          delete updated[view];
          return updated;
        });
-      alert("Er is iets misgegaan bij het uploaden: " + (err.message || "Onbekende fout."));
+      setUploadErrorMsg(`Supabase/Netwerk Fout: ${err.message || 'Onbekende fout'}`);
     } finally {
       setIsUploading(null);
       setDragOverZone(null);
@@ -128,6 +130,13 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
                <span className="text-red-500">Om crashes te voorkomen: zorg dat de afmetingen niet groter zijn dan +/- 2500 pixels breed (max 15MB).</span> Het ruwe gigantische .AI bronbestand voeg je apart bij in je mail.
              </div>
           </div>
+          {uploadErrorMsg && (
+             <div className="bg-red-500 border border-red-700 text-white p-6 rounded-[20px] font-bold shadow-2xl flex flex-col gap-2 mt-4 animate-in fade-in zoom-in duration-300">
+               <span className="uppercase text-xs tracking-widest text-red-200">Kritieke Upload Fout:</span>
+               <span>{uploadErrorMsg}</span>
+               <span className="text-xs font-normal mt-2">Maak een screenshot van dit rode blok en stuur het naar je developer!</span>
+             </div>
+          )}
         </div>
       </div>
 
@@ -166,7 +175,7 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
                       "w-full h-full object-contain p-8",
                       isUploading === zone.id ? "grayscale-[0.5] blur-[2px]" : ""
                    )} />
-                   {zone.id === "front" && article.ai_measurement && !isUploading && (
+                   {zone.id === "front" && article.ai_measurement?.print && !isUploading && (
                       <AIPrintOverlay measurement={article.ai_measurement} />
                    )}
                    {!isViewer && (
@@ -189,7 +198,7 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
                       <span className="px-4 py-2 bg-white/95 backdrop-blur rounded-full text-[10px] font-black uppercase tracking-widest shadow-xl border border-slate-100">
                         {isUploading === zone.id ? "Synchroniseren..." : (image?.file_name || "Lokaal Bestand")}
                       </span>
-                      {zone.id === "front" && !article.ai_measurement && !isUploading && (
+                      {zone.id === "front" && !article.ai_measurement?.print && !isUploading && (
                          <Button
                             onClick={(e) => {
                                e.stopPropagation();
