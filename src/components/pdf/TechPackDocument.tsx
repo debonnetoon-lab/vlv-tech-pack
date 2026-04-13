@@ -132,7 +132,7 @@ const Watermark = ({ isApproved }: { isApproved: boolean }) => (
       
       const label = isApproved ? PDF_STRINGS.approved : PDF_STRINGS.draft;
       for (let i = -2; i <= 2; i++) {
-        ctx.fillText(label, -200, i * 150);
+        ctx.text(label, -200, i * 150);
       }
       ctx.restore();
       return null;

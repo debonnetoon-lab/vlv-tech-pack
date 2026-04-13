@@ -430,8 +430,11 @@ export const useDataStore = create<DataStore>()(
           isSaving: true,
         }));
 
-        const { bom_items, materials, colorways, placements, measurement_points, sizes, ...baseFields } = updates as any; // Cast added to safely destruct remaining fields
+        // Safety timeout to clear saving state if Supabase hangs
+        const safetyTimeout = setTimeout(() => set({ isSaving: false }), 10000);
 
+        const { bom_items, materials, colorways, placements, measurement_points, sizes, ...baseFields } = updates as any; 
+        
         try {
           if (Object.keys(baseFields).length > 0) {
             await supabase.from('products').update(baseFields).eq('id', productId);
@@ -483,6 +486,7 @@ export const useDataStore = create<DataStore>()(
           
           logActivity('updated', 'product', productId, { fields: Object.keys(updates) });
         } finally {
+          clearTimeout(safetyTimeout);
           set({ isSaving: false });
         }
       },
