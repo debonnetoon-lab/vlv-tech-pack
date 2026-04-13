@@ -641,25 +641,65 @@ export const useDataStore = create<DataStore>()(
       },
 
       uploadProductImage: async (productId: string, file: File, view: ProductImage['view']) => {
-        let fileToUpload = file;
-        
-        // Compression for images
+        set({ uploadProgress: 10 });
+        let fileToUpload: Blob = file;
+        let fileExt = 'jpg'; // We hard-override all images to JPG for PDF safety!
+
         if (file.type.startsWith('image/')) {
-          set({ uploadProgress: 10 });
-          const options = {
-            maxSizeMB: 2,
-            maxWidthOrHeight: 2000,
-            useWebWorker: true,
-            onProgress: (p: number) => set({ uploadProgress: 10 + (p * 0.8) })
-          };
           try {
-            fileToUpload = await imageCompression(file, options);
-          } catch (error) {
-            console.error("Compression failed, uploading original:", error);
+            fileToUpload = await new Promise<Blob>((resolve, reject) => {
+              const img = new window.Image();
+              const objectUrl = URL.createObjectURL(file);
+              
+              img.onload = () => {
+                try {
+                  const canvas = document.createElement('canvas');
+                  let width = img.width;
+                  let height = img.height;
+                  
+                  // Downscale to max 2000px
+                  const MAX_SIZE = 2000;
+                  if (width > MAX_SIZE || height > MAX_SIZE) {
+                    const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+                    width = width * ratio;
+                    height = height * ratio;
+                  }
+                  
+                  canvas.width = width;
+                  canvas.height = height;
+                  const ctx = canvas.getContext('2d');
+                  if (!ctx) throw new Error("Canvas 2D failed");
+                  
+                  // Fill with white background to squash PNG transparency
+                  ctx.fillStyle = '#FFFFFF';
+                  ctx.fillRect(0, 0, width, height);
+                  ctx.drawImage(img, 0, 0, width, height);
+                  
+                  set({ uploadProgress: 50 });
+                  canvas.toBlob((blob) => {
+                    URL.revokeObjectURL(objectUrl);
+                    if (blob) resolve(blob);
+                    else reject(new Error("Canvas export failed"));
+                  }, 'image/jpeg', 0.85);
+                } catch(err) {
+                  URL.revokeObjectURL(objectUrl);
+                  reject(err);
+                }
+              };
+              img.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                reject(new Error("Corrupt image"));
+              };
+              img.src = objectUrl;
+            });
+          } catch (e: any) {
+            console.error("Canvas force-jpeg failed:", e);
+            throw new Error(`Upload aborted: kon afbeelding niet omzetten naar JPG. ${e.message}`);
           }
+        } else {
+           fileExt = file.name.split('.').pop() || 'tmp';
         }
 
-        const fileExt = file.name.split('.').pop();
         const fileName = `${productId}/${view}_${Date.now()}.${fileExt}`;
         
         set({ uploadProgress: 90 });
