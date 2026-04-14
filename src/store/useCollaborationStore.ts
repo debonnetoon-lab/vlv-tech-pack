@@ -17,6 +17,7 @@ interface CollaborationStore {
   setFieldLock: (lock: FieldLock) => void;
   removeFieldLock: (articleId: string, fieldKey: string) => void;
   setArticleLocks: (locks: FieldLock[]) => void;
+  removeAllLocksForUser: (userId: string) => void;
 }
 
 export const useCollaborationStore = create<CollaborationStore>((set) => ({
@@ -43,6 +44,15 @@ export const useCollaborationStore = create<CollaborationStore>((set) => ({
     const newLocks = { ...state.lockedFields };
     locks.forEach(lock => {
       newLocks[`${lock.article_id}:${lock.field_key}`] = lock;
+    });
+    return { lockedFields: newLocks };
+  }),
+  removeAllLocksForUser: (userId: string) => set((state) => {
+    const newLocks = { ...state.lockedFields };
+    Object.keys(newLocks).forEach(key => {
+      if (newLocks[key].locked_by === userId) {
+        delete newLocks[key];
+      }
     });
     return { lockedFields: newLocks };
   }),

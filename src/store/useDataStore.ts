@@ -68,6 +68,9 @@ interface DataStore {
   uploadPlacementArtwork: (productId: string, file: File, index: number) => Promise<string>;
   removeProductFile: (fileId: string, storagePath: string) => Promise<void>;
   deleteFileByUrl: (url: string) => Promise<void>;
+  setOrganization: (org: any | null) => void;
+  switchOrganization: (orgId: string) => Promise<void>;
+  initialize: () => Promise<void>;
 }
 
 export const useDataStore = create<DataStore>()(
@@ -82,8 +85,30 @@ export const useDataStore = create<DataStore>()(
       isGlobalAdmin: false,
       uploadProgress: 0,
 
+      setOrganization: (org: any | null) => set({ organization: org }),
+
+      switchOrganization: async (orgId: string) => {
+        const { isGlobalAdmin } = getData();
+        if (!isGlobalAdmin) return;
+
+        set({ organizationId: orgId, activeCollectionId: null, activeArticleId: null });
+        
+        // Fetch new org details
+        const { data: orgData } = await supabase
+          .from('organizations')
+          .select('*')
+          .eq('id', orgId)
+          .single();
+        
+        if (orgData) set({ organization: orgData });
+
+        // Re-fetch collections for this org
+        await getData().fetchCollections();
+      },
+
       fetchOrganization: async () => {
         const { organizationId } = getData();
+
         if (!organizationId) return;
         const { data } = await supabase.from('organizations').select('*').eq('id', organizationId).single();
         if (data) set({ organization: data });
@@ -186,7 +211,7 @@ export const useDataStore = create<DataStore>()(
         }
 
         // ── STEP 1b: Check for Global Admin (Toon) ──
-        const { data: globalAdminCheck } = await supabase.rpc('is_global_admin', { u_id: user.id });
+        const { data: globalAdminCheck } = await supabase.rpc('is_global_admin', { user_id: user.id });
         set({ isGlobalAdmin: !!globalAdminCheck });
 
         // ── STEP 2: Load profile into collaboration store ──

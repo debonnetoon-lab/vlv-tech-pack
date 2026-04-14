@@ -12,7 +12,8 @@ export function CollaborationProvider({ children }: { children: React.ReactNode 
     removeFieldLock, 
     setArticleLocks,
     activeArticleId,
-    setActiveUsers
+    setActiveUsers,
+    removeAllLocksForUser
   } = useTechPackStore();
 
   useEffect(() => {
@@ -29,9 +30,7 @@ export function CollaborationProvider({ children }: { children: React.ReactNode 
 
     const onFieldUnlock = (data: { article_id: string; field_key: string; all_for_user?: string }) => {
       if (data.all_for_user) {
-        // Handle bulk unlock if a user leaves
-        // (Optional: filter store and remove all for that user)
-        // For simplicity, we can just re-fetch locks or handle individually
+        removeAllLocksForUser(data.all_for_user);
       } else {
         removeFieldLock(data.article_id, data.field_key);
       }

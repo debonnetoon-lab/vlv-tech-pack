@@ -17,6 +17,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useDataStore, useUIStore } from "@/store";
+
 
 interface Organization {
   id: string;
@@ -36,6 +38,10 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  
+  const switchOrganization = useDataStore(s => s.switchOrganization);
+  const setAdminDashboardOpen = useUIStore(s => s.setAdminDashboardOpen);
+
 
   const fetchOrganizations = async () => {
     setLoading(true);
@@ -81,12 +87,23 @@ export default function AdminDashboard() {
           org.id === orgId ? { ...org, status: newStatus as any } : org
         ));
       }
-    } catch (err) {
-      console.error("Update mislukt:", err);
     } finally {
       setActionLoading(null);
     }
   };
+
+  const handleImpersonate = async (orgId: string) => {
+    setActionLoading(orgId);
+    try {
+      await switchOrganization(orgId);
+      setAdminDashboardOpen(false); // Close admin dashboard to see the workspace
+    } catch (err) {
+      console.error("Impersonation failed:", err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
 
   const filteredOrgs = organizations.filter(org => {
     const matchesSearch = org.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -243,9 +260,19 @@ export default function AdminDashboard() {
                           disabled={actionLoading === org.id}
                           className="h-11 px-6 bg-white border border-slate-200 text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
                         >
-                          Herstelho
+                          Reactiveer
                         </button>
                       )}
+
+                      <button 
+                        onClick={() => handleImpersonate(org.id)}
+                        disabled={actionLoading === org.id}
+                        className="h-11 px-4 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                        title="Bekijk Werkruimte"
+                      >
+                        {actionLoading === org.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                        Bekijk
+                      </button>
 
                       <button className="w-11 h-11 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
                         <MoreVertical className="w-4 h-4" />
