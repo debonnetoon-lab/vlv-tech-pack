@@ -31,6 +31,7 @@ CREATE TABLE public.profiles (
   id            UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   full_name     TEXT NOT NULL DEFAULT '',
   avatar_url    TEXT,
+  role          TEXT DEFAULT 'input',
   created_at    TIMESTAMPTZ DEFAULT now(),
   updated_at    TIMESTAMPTZ DEFAULT now()
 );
@@ -259,6 +260,56 @@ CREATE TRIGGER trg_on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Deletion Safeguards (Triggers)
+CREATE OR REPLACE FUNCTION public.check_member_deletion()
+RETURNS TRIGGER AS $$
+DECLARE
+    deleter_id UUID := auth.uid();
+    deleter_role TEXT;
+    target_role TEXT := OLD.role;
+    owner_count INTEGER;
+BEGIN
+    -- 0. Global Admin (Toon) can delete anyone EXCEPT himself
+    IF public.is_global_admin(deleter_id) THEN
+        IF OLD.user_id = deleter_id THEN
+            RAISE EXCEPTION 'Toon kan zichzelf niet verwijderen.';
+        END IF;
+        RETURN OLD;
+    END IF;
+
+    -- 1. Prevent self-deletion
+    IF OLD.user_id = deleter_id THEN
+        RAISE EXCEPTION 'Je kunt jezelf niet verwijderen. Neem contact op met een andere beheerder.';
+    END IF;
+
+    -- Get deleter role
+    SELECT role INTO deleter_role FROM public.organization_members 
+    WHERE organization_id = OLD.organization_id AND user_id = deleter_id;
+
+    -- 2. Admin cannot delete Owner
+    IF deleter_role = 'admin' AND target_role = 'owner' THEN
+        RAISE EXCEPTION 'Een beheerder kan de eigenaar van de organisatie niet verwijderen.';
+    END IF;
+
+    -- 3. Ensure at least one owner remains
+    IF target_role = 'owner' THEN
+        SELECT COUNT(*) INTO owner_count FROM public.organization_members 
+        WHERE organization_id = OLD.organization_id AND role = 'owner';
+        
+        IF owner_count <= 1 THEN
+            RAISE EXCEPTION 'De laatste eigenaar van de organisatie kan niet worden verwijderd.';
+        END IF;
+    END IF;
+
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS trg_check_member_deletion ON public.organization_members;
+CREATE TRIGGER trg_check_member_deletion
+BEFORE DELETE ON public.organization_members
+FOR EACH ROW EXECUTE FUNCTION public.check_member_deletion();
+
 -- Enable RLS
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.organization_members ENABLE ROW LEVEL SECURITY;
@@ -276,25 +327,46 @@ ALTER TABLE public.comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.export_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 
--- Dynamic Membership Check Function
+-- Dynamic Membership Check Function: Includes Global Admin & Organization Status
 CREATE OR REPLACE FUNCTION public.is_member_of(_org_id UUID)
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.organization_members
-    WHERE organization_id = _org_id AND user_id = auth.uid()
-  );
-$$ LANGUAGE sql SECURITY DEFINER;
+BEGIN
+  -- Global Admin always has access
+  IF public.is_global_admin(auth.uid()) THEN
+    RETURN TRUE;
+  END IF;
 
--- New: Role Check Helper
+  -- Normal users check membership AND org status
+  RETURN EXISTS (
+    SELECT 1 FROM public.organization_members m
+    JOIN public.organizations o ON o.id = m.organization_id
+    WHERE m.organization_id = _org_id 
+    AND m.user_id = auth.uid()
+    AND o.status = 'active'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- New: Role Check Helper: Includes Global Admin & Organization Status
 CREATE OR REPLACE FUNCTION public.has_role_in_org(_org_id UUID, _allowed_roles TEXT[])
 RETURNS BOOLEAN AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.organization_members
-    WHERE organization_id = _org_id 
-    AND user_id = auth.uid() 
-    AND role = ANY(_allowed_roles)
+BEGIN
+  -- Global Admin always counts as having the role
+  IF public.is_global_admin(auth.uid()) THEN
+    RETURN TRUE;
+  END IF;
+
+  -- Normal users check role AND org status
+  RETURN EXISTS (
+    SELECT 1 FROM public.organization_members m
+    JOIN public.organizations o ON o.id = m.organization_id
+    WHERE m.organization_id = _org_id 
+    AND m.user_id = auth.uid() 
+    AND m.role = ANY(_allowed_roles)
+    AND o.status = 'active'
   );
-$$ LANGUAGE sql SECURITY DEFINER;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ─────────────────────────────────────────────
 --  5b. RPC: Ensure user has an organization (called on login)

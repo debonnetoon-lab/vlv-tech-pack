@@ -10,6 +10,8 @@ import { supabase } from "@/lib/supabase";
 import LoginForm from "@/components/auth/LoginForm";
 import RegisterForm from "@/components/auth/RegisterForm";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
+
 
 function PresenceBanner() {
   const { activeUsers = [], profile } = useTechPackStore();
@@ -81,11 +83,9 @@ function PresenceBanner() {
     </div>
   );
 }
-const PDFPreview = dynamic(() => import("@/components/preview/PDFPreview"), {
-  ssr: false,
-});
+const PendingScreen = dynamic(() => import("@/components/dashboard/PendingScreen"), { ssr: false });
+const SuspendedScreen = dynamic(() => import("@/components/dashboard/SuspendedScreen"), { ssr: false });
 
-import PendingScreen from "@/components/dashboard/PendingScreen";
 import { useSocket } from "@/hooks/useSocket";
 
 export default function Home() {
@@ -159,10 +159,14 @@ export default function Home() {
 
   const { organization, isGlobalAdmin } = useDataStore();
 
-  // ── BLOCKER: Pending Approval ──
-  // Only block if NOT global admin (Toon) and org is pending
-  if (organization?.status === 'pending' && !isGlobalAdmin) {
-    return <PendingScreen />;
+  // ── BLOKKERING: PENDING OF SUSPENDED ORGANISATIE ──
+  if (!isGlobalAdmin) {
+    if (organization?.status === 'pending') {
+      return <PendingScreen />;
+    }
+    if (organization?.status === 'suspended') {
+      return <SuspendedScreen />;
+    }
   }
 
   return (

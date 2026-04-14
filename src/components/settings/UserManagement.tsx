@@ -40,8 +40,10 @@ export default function UserManagement() {
   const [resetTarget, setResetTarget]     = useState<string | null>(null); // user id being reset
   const [newPassword, setNewPassword]     = useState("");
   const [resetStatus, setResetStatus]     = useState<{ id: string; type: 'success' | 'error'; message: string } | null>(null);
+  const [isDeleting, setIsDeleting]       = useState<string | null>(null); // user id being deleted
 
-  // ─── Fetch existing users ────────────────────────────────────────────
+  const currentUser = useTechPackStore(s => s.user);
+  const { isGlobalAdmin, userRole } = useTechPackStore();
   const fetchUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
@@ -123,6 +125,35 @@ export default function UserManagement() {
     }
   };
 
+  // ─── Delete user ─────────────────────────────────────────────────────
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Weet je zeker dat je deze gebruiker wilt verwijderen? Dit kan niet ongedaan worden gemaakt.")) return;
+    
+    setIsDeleting(userId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Niet ingelogd");
+
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ user_id: userId })
+      });
+      
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Verwijderen mislukt");
+
+      setUsers(prev => prev.filter(u => u.id !== userId));
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
   return (
     <div className="space-y-8">
 
@@ -185,6 +216,20 @@ export default function UserManagement() {
                     >
                       <Key className="w-3 h-3" />
                     </button>
+
+                    {/* Deletion Logic with hierarchy safeguards */}
+                    {((isGlobalAdmin && u.id !== currentUser?.id) || 
+                      (userRole === 'owner' && u.id !== currentUser?.id) || 
+                      (userRole === 'admin' && u.role !== 'owner' && u.id !== currentUser?.id)) && (
+                      <button
+                        onClick={() => handleDeleteUser(u.id)}
+                        disabled={isDeleting === u.id}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-all ml-1"
+                        title="Gebruiker verwijderen"
+                      >
+                        {isDeleting === u.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+                      </button>
+                    )}
                   </div>
                 </div>
 
