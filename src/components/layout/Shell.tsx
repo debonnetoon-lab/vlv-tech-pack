@@ -13,6 +13,13 @@ const DataManagement = dynamic(() => import("../settings/DataManagement"), {
   loading: () => <div className="p-10 flex items-center justify-center"><Plus className="w-8 h-8 animate-spin text-slate-200" /></div>
 });
 
+const AdminDashboard = dynamic(() => import("../admin/AdminDashboard"), {
+  ssr: false,
+  loading: () => <div className="p-10 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-200" /></div>
+});
+
+import { Loader2 } from "lucide-react";
+
 interface ShellProps {
   sidebar: React.ReactNode;
   form: React.ReactNode;
@@ -30,7 +37,7 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
     setActiveStep
   } = useTechPackStore();
 
-  const { isSettingsOpen, setSettingsOpen } = useUIStore();
+  const { isSettingsOpen, setSettingsOpen, isAdminDashboardOpen } = useUIStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -121,9 +128,9 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
                     activeCollection ? "hover:text-slate-900 cursor-pointer" : "opacity-30"
                   )}
                 >
-                  {activeCollection?.name || "Collectie"}
+                  {isAdminDashboardOpen ? "Global Admin" : (activeCollection?.name || "Collectie")}
                 </button>
-                {activeArticle && (
+                {activeArticle && !isAdminDashboardOpen && (
                   <>
                     <span className="text-slate-200">/</span>
                     <span className="text-slate-900 truncate max-w-[250px] italic">
@@ -150,14 +157,22 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
 
         {/* SCROLL AREA */}
         <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#FDFDFD]">
-          {form}
+          {isAdminDashboardOpen ? (
+            <div className="p-10 max-w-[1400px] mx-auto">
+              <AdminDashboard />
+            </div>
+          ) : (
+            form
+          )}
         </main>
       </div>
 
       {/* ── PREVIEW PANEL (Inklapbaar op kleine schermen) ── */}
-      <section className="hidden xl:flex w-[380px] bg-white border-l border-[#1D9E75]/10 flex-shrink-0 flex flex-col">
-        {preview}
-      </section>
+      {!isAdminDashboardOpen && (
+        <section className="hidden xl:flex w-[380px] bg-white border-l border-[#1D9E75]/10 flex-shrink-0 flex flex-col">
+          {preview}
+        </section>
+      )}
 
       {/* ── SETTINGS MODAL (Moved from Sidebar for centering) ── */}
       <AnimatePresence>

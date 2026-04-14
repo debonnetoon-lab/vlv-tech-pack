@@ -11,7 +11,8 @@ import {
   Search,
   LogOut,
   ChevronRight,
-  Building
+  Building,
+  ShieldCheck
 } from "lucide-react";
 import { useTechPackStore, useUIStore, useDataStore } from "@/store";
 import { cn } from "@/lib/utils";
@@ -28,8 +29,11 @@ export default function Sidebar() {
     setActiveArticle,
     activeCollectionId,
     activeArticleId,
-    userRole
+    userRole,
+    isGlobalAdmin
   } = useTechPackStore();
+
+  const { isAdminDashboardOpen, setAdminDashboardOpen } = useUIStore();
 
   const isViewer = userRole === 'viewer';
   
@@ -50,8 +54,15 @@ export default function Sidebar() {
       setActiveArticle(null);
       setActiveCollection(null);
       setSettingsOpen(false);
+      setAdminDashboardOpen(false);
     } else if (id === "settings") {
       setSettingsOpen(true);
+      setAdminDashboardOpen(false);
+    } else if (id === "admin") {
+      setAdminDashboardOpen(true);
+      setActiveArticle(null);
+      setActiveCollection(null);
+      setSettingsOpen(false);
     }
   };
 
@@ -232,6 +243,27 @@ export default function Sidebar() {
             )}
           </div>
         ))}
+
+        {/* ── GLOBAL ADMIN ACCESS ── */}
+        {isGlobalAdmin && (
+          <div className="pt-4 mt-2 border-t border-white/[0.03]">
+            <p className="px-5 mb-2 text-[9px] font-black uppercase tracking-[0.2em] text-white/20">System Admin</p>
+            <button
+              onClick={() => handleNavClick("admin")}
+              className={cn(
+                "w-full flex items-center gap-3 p-3 rounded-xl transition-all relative group",
+                isAdminDashboardOpen 
+                  ? "bg-indigo-600 text-white font-black shadow-lg shadow-indigo-600/20" 
+                  : "text-white/40 hover:bg-white/[0.03] hover:text-white"
+              )}
+            >
+              <ShieldCheck className={cn("w-5 h-5 shrink-0", isAdminDashboardOpen ? "text-white" : "text-indigo-400/60 group-hover:text-indigo-400")} />
+              {!isCollapsed && (
+                <span className="text-xs uppercase tracking-widest leading-none mt-0.5 flex-1 text-left">Global Admin</span>
+              )}
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* ── ORGANIZATION & PROFILE ── */}

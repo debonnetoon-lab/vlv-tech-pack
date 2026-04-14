@@ -48,6 +48,7 @@ interface DataStore {
   activityLogs: any[];
   isSaving: boolean;
   userRole: 'owner' | 'admin' | 'designer' | 'viewer' | null;
+  isGlobalAdmin: boolean;
   
   repairOrganization: () => Promise<void>;
   fetchOrganization: () => Promise<void>;
@@ -78,6 +79,7 @@ export const useDataStore = create<DataStore>()(
       activityLogs: [],
       isSaving: false,
       userRole: null,
+      isGlobalAdmin: false,
       uploadProgress: 0,
 
       fetchOrganization: async () => {
@@ -182,6 +184,10 @@ export const useDataStore = create<DataStore>()(
           
           if (mems && mems.length > 0) set({ userRole: mems[0].role as any });
         }
+
+        // ── STEP 1b: Check for Global Admin (Toon) ──
+        const { data: globalAdminCheck } = await supabase.rpc('is_global_admin', { u_id: user.id });
+        set({ isGlobalAdmin: !!globalAdminCheck });
 
         // ── STEP 2: Load profile into collaboration store ──
         const { data: profileData } = await supabase

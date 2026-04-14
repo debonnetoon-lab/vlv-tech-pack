@@ -81,14 +81,11 @@ function PresenceBanner() {
     </div>
   );
 }
-import WizardStepper from "@/components/wizard/WizardStepper";
-import dynamic from "next/dynamic";
-
-// PDF components often need dynamic import with ssr: false in Next.js
 const PDFPreview = dynamic(() => import("@/components/preview/PDFPreview"), {
   ssr: false,
 });
 
+import PendingScreen from "@/components/dashboard/PendingScreen";
 import { useSocket } from "@/hooks/useSocket";
 
 export default function Home() {
@@ -158,6 +155,14 @@ export default function Home() {
         )}
       </div>
     );
+  }
+
+  const { organization, isGlobalAdmin } = useDataStore();
+
+  // ── BLOCKER: Pending Approval ──
+  // Only block if NOT global admin (Toon) and org is pending
+  if (organization?.status === 'pending' && !isGlobalAdmin) {
+    return <PendingScreen />;
   }
 
   return (

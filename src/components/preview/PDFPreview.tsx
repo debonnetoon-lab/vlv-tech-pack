@@ -10,6 +10,7 @@ import { PDFErrorBoundary } from "../pdf/PDFErrorBoundary";
 
 export default function PDFPreview() {
   const { collections, activeCollectionId, activeArticleId } = useTechPackStore();
+  const organization = useDataStore(state => state.organization);
   const [isDownloading, setIsDownloading] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
@@ -21,7 +22,7 @@ export default function PDFPreview() {
     const generatePreview = async () => {
       if (!activeArticle) return;
       try {
-        const doc = <TechPackDocument article={activeArticle} collectionName={activeCollection?.name || "VLV"} />;
+        const doc = <TechPackDocument article={activeArticle} organization={organization} collectionName={activeCollection?.name || "VLV"} />;
         const asPdf = pdf(doc);
         const blob = await asPdf.toBlob();
         if (active) {
@@ -52,7 +53,7 @@ export default function PDFPreview() {
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      const blob = await pdf(<TechPackDocument article={activeArticle} collectionName={activeCollection?.name || "VLV"} />).toBlob();
+      const blob = await pdf(<TechPackDocument article={activeArticle} organization={organization} collectionName={activeCollection?.name || "VLV"} />).toBlob();
       const sanitizeFileName = (name: string) => name.replace(/[^a-z0-9]/gi, '_').toUpperCase();
       const fileName = `${sanitizeFileName(activeArticle.article_code || "VLV-ARTICLE")}.pdf`;
       saveAs(blob, fileName);

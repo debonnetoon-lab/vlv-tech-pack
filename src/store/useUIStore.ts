@@ -7,6 +7,7 @@ interface UIStore {
   isOnline: boolean;
   isSettingsOpen: boolean;
   isCollectionModalOpen: boolean;
+  isAdminDashboardOpen: boolean;
   
   setActiveCollection: (id: string | null) => void;
   setActiveArticle: (id: string | null) => void;
@@ -23,6 +24,7 @@ export const useUIStore = create<UIStore>((set) => ({
   isOnline: true,
   isSettingsOpen: false,
   isCollectionModalOpen: false,
+  isAdminDashboardOpen: false,
 
   setActiveCollection: (id: string | null) => set({ activeCollectionId: id }),
   setActiveArticle: (id: string | null) => set({ activeArticleId: id, activeStep: 1 }),
@@ -30,4 +32,5 @@ export const useUIStore = create<UIStore>((set) => ({
   setIsOnline: (online: boolean) => set({ isOnline: online }),
   setSettingsOpen: (open: boolean) => set({ isSettingsOpen: open }),
   setCollectionModalOpen: (open: boolean) => set({ isCollectionModalOpen: open }),
+  setAdminDashboardOpen: (open: boolean) => set({ isAdminDashboardOpen: open }),
 }));

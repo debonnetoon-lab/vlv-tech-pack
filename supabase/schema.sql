@@ -13,6 +13,8 @@ GRANT ALL ON SCHEMA public TO dashboard_user;
 --  1. ORGANIZATIONS & USERS
 -- ─────────────────────────────────────────────
 
+CREATE TYPE public.org_status AS ENUM ('pending', 'active', 'suspended');
+
 CREATE TABLE public.organizations (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name          TEXT NOT NULL,
@@ -20,6 +22,7 @@ CREATE TABLE public.organizations (
   logo_url      TEXT,
   currency      TEXT DEFAULT 'EUR',
   size_system   TEXT DEFAULT 'EU',
+  status        org_status DEFAULT 'pending',
   created_at    TIMESTAMPTZ DEFAULT now(),
   updated_at    TIMESTAMPTZ DEFAULT now()
 );
@@ -477,3 +480,17 @@ GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+
+-- ─────────────────────────────────────────────
+--  8. GLOBAL ADMIN HELPERS
+-- ─────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.is_global_admin(u_id UUID)
+RETURNS BOOLEAN AS $$
+DECLARE
+    user_email TEXT;
+BEGIN
+    SELECT email INTO user_email FROM auth.users WHERE id = u_id;
+    RETURN user_email = 'toon@vivelevelo.be';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
