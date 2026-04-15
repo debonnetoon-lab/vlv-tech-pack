@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vlv-cache-v2';
+const CACHE_NAME = 'vlv-cache-v3';
 const STATIC_ASSETS = [
   '/offline.html',
   '/manifest.json',
