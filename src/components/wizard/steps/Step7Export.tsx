@@ -11,7 +11,8 @@ import {
   Loader2,
   ShieldCheck,
   AlertCircle,
-  ArrowRight
+  ArrowRight,
+  Copy as CopyIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PDFDownloadLink } from "@react-pdf/renderer";
@@ -178,7 +179,7 @@ export default function Step7Export({ article, collectionId }: { article: any, c
                          copied ? "bg-[#22c981] text-[#0b1912]" : "bg-white text-[#0b1912]"
                        )}
                      >
-                       {copied ? <Check className="w-4 h-4" /> : <Loader2 className="w-4 h-4 animate-spin" />}
+                       {copied ? <Check className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
                        {copied ? "Gecopieerd" : "Copy"}
                      </button>
                   </div>
