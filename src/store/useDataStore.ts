@@ -25,20 +25,35 @@ const debouncedSet = debounceAsync(set, 1000);
 
 const idbStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
-    return (await get(name)) || null;
+    try {
+      return (await get(name)) || null;
+    } catch (e) {
+      console.warn("IndexedDB blocked (Incognito mode?)", e);
+      return null;
+    }
   },
   setItem: async (name: string, value: string): Promise<void> => {
-    debouncedSet(name, value);
+    try {
+      debouncedSet(name, value);
+    } catch (e) {}
   },
   removeItem: async (name: string): Promise<void> => {
-    await del(name);
+    try {
+      await del(name);
+    } catch (e) {}
   },
 };
 
 export const assetStorage = {
-  get: async (id: string) => await get(`asset:${id}`),
-  set: async (id: string, data: string) => await set(`asset:${id}`, data),
-  del: async (id: string) => await del(`asset:${id}`)
+  get: async (id: string) => {
+    try { return await get(`asset:${id}`); } catch (e) { return undefined; }
+  },
+  set: async (id: string, data: string) => {
+    try { await set(`asset:${id}`, data); } catch (e) {}
+  },
+  del: async (id: string) => {
+    try { await del(`asset:${id}`); } catch (e) {}
+  }
 };
 
 interface DataStore {
