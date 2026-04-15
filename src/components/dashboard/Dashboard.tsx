@@ -303,9 +303,6 @@ export default function Dashboard() {
 
       </div>
 
-      {/* Global Modals */}
-      <CollectionModal />
-
     </div>
   );
 }

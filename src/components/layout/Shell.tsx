@@ -18,6 +18,10 @@ const AdminDashboard = dynamic(() => import("../admin/AdminDashboard"), {
   loading: () => <div className="p-10 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-200" /></div>
 });
 
+const CollectionModal = dynamic(() => import("../dashboard/CollectionModal"), {
+  ssr: false
+});
+
 import { Loader2 } from "lucide-react";
 
 interface ShellProps {
@@ -204,6 +208,8 @@ export default function Shell({ sidebar, form, preview }: ShellProps) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <CollectionModal />
     </div>
   );
 }
