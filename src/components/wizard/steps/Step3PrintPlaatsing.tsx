@@ -2,7 +2,7 @@
 
 import React from "react";
 import { TechPackProduct, ArtworkPlacement } from "@/types/tech-pack";
-import { useTechPackStore } from "@/store";
+import { useTechPackStore, useDataStore } from "@/store";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";

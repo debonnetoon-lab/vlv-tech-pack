@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
+import { useTechPackStore } from "@/store";
 
-type Role = 'admin' | 'user' | 'input';
+type Role = 'owner' | 'admin' | 'designer' | 'user' | 'input' | 'viewer';
 
 interface AppUser {
   id: string;
@@ -19,9 +20,12 @@ interface AppUser {
 }
 
 const ROLE_LABELS: Record<Role, { label: string; color: string; bg: string }> = {
-  admin:  { label: 'Beheerder', color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-100' },
-  user:   { label: 'Gebruiker', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-100' },
-  input:  { label: 'Input',     color: 'text-amber-700',  bg: 'bg-amber-50 border-amber-100'  },
+  owner:    { label: 'Eigenaar',  color: 'text-purple-700', bg: 'bg-purple-50 border-purple-100' },
+  admin:    { label: 'Beheerder', color: 'text-indigo-700', bg: 'bg-indigo-50 border-indigo-100' },
+  designer: { label: 'Designer',  color: 'text-blue-700',   bg: 'bg-blue-50 border-blue-100'     },
+  user:     { label: 'Gebruiker', color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-100' },
+  input:    { label: 'Input',     color: 'text-amber-700',  bg: 'bg-amber-50 border-amber-100'   },
+  viewer:   { label: 'Viewer',    color: 'text-slate-600',  bg: 'bg-slate-50 border-slate-200'   },
 };
 
 export default function UserManagement() {

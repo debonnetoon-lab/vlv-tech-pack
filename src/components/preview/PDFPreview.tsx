@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useTechPackStore } from "@/store";
+import { useTechPackStore, useDataStore } from "@/store";
 import { Loader2 } from "lucide-react";
 import { TechPackDocument } from "../pdf/TechPackDocument";
 import { saveAs } from "file-saver";

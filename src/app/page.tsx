@@ -85,6 +85,7 @@ function PresenceBanner() {
 }
 const PendingScreen = dynamic(() => import("@/components/dashboard/PendingScreen"), { ssr: false });
 const SuspendedScreen = dynamic(() => import("@/components/dashboard/SuspendedScreen"), { ssr: false });
+const PDFPreview = dynamic(() => import("@/components/preview/PDFPreview"), { ssr: false });
 
 import { useSocket } from "@/hooks/useSocket";
 

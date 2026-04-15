@@ -15,6 +15,7 @@ interface UIStore {
   setIsOnline: (online: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
   setCollectionModalOpen: (open: boolean) => void;
+  setAdminDashboardOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({

@@ -103,7 +103,7 @@ export default function Step2Afbeeldingen({ article, collectionId }: { article: 
     if (isViewer) return;
     setIsDeleting(image.id);
     try {
-      await useDataStore.getState().removeProductFile(image.id, image.file_url);
+      await useDataStore.getState().removeProductFile(image.id, image.storage_path);
     } catch (err) {
       console.error(err);
     } finally {

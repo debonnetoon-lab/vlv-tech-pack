@@ -91,7 +91,9 @@ export const useDataStore = create<DataStore>()(
         const { isGlobalAdmin } = getData();
         if (!isGlobalAdmin) return;
 
-        set({ organizationId: orgId, activeCollectionId: null, activeArticleId: null });
+        // Reset active selection in UIStore (it lives there, not in DataStore)
+        useUIStore.getState().setActiveCollection(null);
+        useUIStore.getState().setActiveArticle(null);
         
         // Fetch new org details
         const { data: orgData } = await supabase
@@ -658,8 +660,10 @@ export const useDataStore = create<DataStore>()(
           }
           
           await fetchCollections();
-          logActivity('duplicated', 'product', newProductId, { original_id: productId });
-          useUIStore.getState().setActiveArticle(newProductId);
+          if (newProductId) {
+            logActivity('duplicated', 'product', newProductId, { original_id: productId });
+            useUIStore.getState().setActiveArticle(newProductId);
+          }
 
         } catch (error: any) {
           console.error("Atomic Duplication Failed:", error);
@@ -755,7 +759,12 @@ export const useDataStore = create<DataStore>()(
         if (path) {
           await supabase.storage.from('tech-pack-assets').remove([path]);
         }
-      }
+      },
+
+      initialize: async () => {
+        // Alias for fetchCollections — satisfies the DataStore interface
+        await getData().fetchCollections();
+      },
     }),
     {
       name: "vlv-data-storage-v3",
