@@ -157,6 +157,7 @@ export default function Home() {
         )}
       </div>
     );
+  }
   // ── BLOKKERING: PENDING OF SUSPENDED ORGANISATIE ──
   if (!isGlobalAdmin) {
     if (organization?.status === 'pending') {
