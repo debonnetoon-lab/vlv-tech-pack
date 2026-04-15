@@ -91,6 +91,7 @@ import { useSocket } from "@/hooks/useSocket";
 
 export default function Home() {
   const { user, setUser, fetchCollections } = useTechPackStore();
+  const { organization, isGlobalAdmin } = useDataStore();
   const [initializing, setInitializing] = React.useState(true);
   const [authView, setAuthView] = React.useState<"login" | "register">("login");
   
@@ -156,10 +157,6 @@ export default function Home() {
         )}
       </div>
     );
-  }
-
-  const { organization, isGlobalAdmin } = useDataStore();
-
   // ── BLOKKERING: PENDING OF SUSPENDED ORGANISATIE ──
   if (!isGlobalAdmin) {
     if (organization?.status === 'pending') {
