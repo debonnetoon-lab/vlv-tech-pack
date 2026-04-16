@@ -250,6 +250,7 @@ export const TechPackPages = ({ article, organization, collectionName }: any) =>
           )}
         </View>
 
+        {/* HIDDEN BY REQUEST 
         <Text style={styles.sectionLabel}>{PDF_STRINGS.sizeSpecsTitle}</Text>
         <View style={styles.table}>
           <View style={styles.trHead}>
@@ -273,6 +274,7 @@ export const TechPackPages = ({ article, organization, collectionName }: any) =>
              <Text style={styles.tdSub}>No measurement points configured.</Text>
           )}
         </View>
+        */}
 
         <View style={{ flexDirection: "row", gap: 20 }}>
           <View style={{ flex: 1 }}>

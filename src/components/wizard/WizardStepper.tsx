@@ -23,7 +23,7 @@ const STEPS = [
   { id: 3, type: 'prints', title: "Prints", icon: Palette },
   { id: 4, type: 'colorways', title: "Colorways", icon: Droplets },
   { id: 5, type: 'materials', title: "Materialen", icon: Droplets },
-  { id: 6, type: 'size specs', title: "Size Specs", icon: Ruler },
+  // { id: 6, type: 'size specs', title: "Size Specs", icon: Ruler }, // HIDDEN BY REQUEST
   { id: 7, type: 'order qty', title: "Order QTY", icon: ListChecks },
   { id: 8, type: 'labels', title: "Labels", icon: Tag },
   { id: 9, type: 'export', title: "Export", icon: Download },

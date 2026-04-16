@@ -61,9 +61,9 @@ export const useTechPackValidation = (product: TechPackProduct | null): Validati
       if (!main.weight_gsm) addError(5, "GSM Gewicht (Hoofdstof)", "fabric_gsm");
     }
 
-    // Step 6: Size Specs
-    const points = (product as any).measurement_points || [];
-    if (points.length === 0) addError(6, "Minimaal 1 Meetpunt (POM)", "measurement_points");
+    // Step 6: Size Specs (HIDDEN BY REQUEST)
+    // const points = (product as any).measurement_points || [];
+    // if (points.length === 0) addError(6, "Minimaal 1 Meetpunt (POM)", "measurement_points");
 
     // Step 7: Order QTY
     const sizes = product.sizes || [];
