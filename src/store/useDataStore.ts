@@ -554,33 +554,42 @@ export const useDataStore = create<DataStore>()(
         const { logActivity } = getData();
         
         try {
-          // 1. Cleanup Storage
+          // 1. Cleanup Storage (gracefully skip if fails)
           const { data: files } = await supabase.storage.from('tech-pack-assets').list(productId);
           if (files && files.length > 0) {
             await supabase.storage.from('tech-pack-assets').remove(files.map(f => `${productId}/${f.name}`));
           }
 
-          // 2. Delete DB Record (Cascades will handles sub-entities)
-          await supabase.from('products').delete().eq('id', productId);
+          // 2. Delete DB Record
+          const { error } = await supabase.from('products').delete().eq('id', productId);
+          
+          if (error) throw new Error(error.message);
           
           set((state) => ({
-            collections: state.collections.map((col) =>
-              col.id === collectionId ? { ...col, products: col.products.filter(p => p.id !== productId) } : col
+            collections: (state.collections || []).map((col) =>
+              col.id === collectionId ? { ...col, products: (col.products || []).filter(p => p.id !== productId) } : col
             ),
           }));
           
           logActivity('deleted', 'product', productId);
-        } catch (error) {
+        } catch (error: any) {
           console.error("Failed to fully remove product:", error);
-          alert("Verwijderen mislukt: Probeer het later opnieuw.");
+          alert("Verwijderen mislukt: " + error.message);
         }
       },
 
       removeCollection: async (collectionId: string) => {
         const { logActivity } = getData();
-        await supabase.from('collections').delete().eq('id', collectionId);
-        set((state) => ({ collections: state.collections.filter(c => c.id !== collectionId) }));
-        logActivity('deleted', 'collection', collectionId);
+        try {
+          const { error } = await supabase.from('collections').delete().eq('id', collectionId);
+          if (error) throw new Error(error.message);
+          
+          set((state) => ({ collections: (state.collections || []).filter(c => c.id !== collectionId) }));
+          logActivity('deleted', 'collection', collectionId);
+        } catch (error: any) {
+          console.error("Failed to remove collection:", error);
+          alert("Verwijderen mislukt: " + error.message);
+        }
       },
 
       duplicateProduct: async (collectionId: string, productId: string) => {
