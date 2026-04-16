@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS public.global_admins (
 
 -- Protect table from client-side writes
 ALTER TABLE public.global_admins ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "global_admins_read_only" ON public.global_admins;
 CREATE POLICY "global_admins_read_only" ON public.global_admins FOR SELECT TO authenticated USING (true);
 -- No policies for INSERT, UPDATE, DELETE means they are denied by default for all users.
 
