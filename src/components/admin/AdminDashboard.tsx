@@ -1,288 +1,191 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
+import { useTechPackStore, useUIStore } from "@/store";
 import { 
+  X, 
+  UserCheck, 
   Building2, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  ShieldAlert,
+  Mail, 
+  Calendar,
+  AlertCircle,
   Loader2,
-  ExternalLink,
-  Users
+  ShieldCheck,
+  CheckCircle2,
+  Clock,
+  ExternalLink
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { format } from "date-fns";
+import { nl } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
-import { useDataStore, useUIStore } from "@/store";
-
-
-interface Organization {
-  id: string;
-  name: string;
-  slug: string;
-  status: 'pending' | 'active' | 'suspended';
-  created_at: string;
-  members: Array<{
-    user_id: string;
-    role: string;
-  }>;
-}
 
 export default function AdminDashboard() {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const { 
+    pendingOrganizations, 
+    pendingCount,
+    fetchPendingOrganizations,
+    approveOrganization,
+    isSaving,
+    switchOrganization
+  } = useTechPackStore();
   
-  const switchOrganization = useDataStore(s => s.switchOrganization);
-  const setAdminDashboardOpen = useUIStore(s => s.setAdminDashboardOpen);
-
-
-  const fetchOrganizations = async () => {
-    setLoading(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const res = await fetch("/api/admin/organizations", {
-        headers: { "Authorization": `Bearer ${session.access_token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setOrganizations(data.organizations || []);
-      }
-    } catch (err) {
-      console.error("Fout bij ophalen organisaties:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { setAdminDashboardOpen } = useUIStore();
 
   useEffect(() => {
-    fetchOrganizations();
-  }, []);
-
-  const handleUpdateStatus = async (orgId: string, newStatus: string) => {
-    setActionLoading(orgId);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const res = await fetch("/api/admin/organizations", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ id: orgId, status: newStatus })
-      });
-
-      if (res.ok) {
-        setOrganizations(prev => prev.map(org => 
-          org.id === orgId ? { ...org, status: newStatus as any } : org
-        ));
-      }
-    } finally {
-      setActionLoading(null);
-    }
-  };
+    fetchPendingOrganizations();
+  }, [fetchPendingOrganizations]);
 
   const handleImpersonate = async (orgId: string) => {
-    setActionLoading(orgId);
     try {
       await switchOrganization(orgId);
-      setAdminDashboardOpen(false); // Close admin dashboard to see the workspace
+      setAdminDashboardOpen(false);
     } catch (err) {
       console.error("Impersonation failed:", err);
-    } finally {
-      setActionLoading(null);
     }
-  };
-
-
-  const filteredOrgs = organizations.filter(org => {
-    const matchesSearch = org.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          org.slug.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterStatus === "all" || org.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
-
-  const stats = {
-    total: organizations.length,
-    pending: organizations.filter(o => o.status === 'pending').length,
-    active: organizations.filter(o => o.status === 'active').length
   };
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       {/* ── HEADER ── */}
-      <div className="bg-white p-10 rounded-[40px] border border-slate-100 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 opacity-[0.03] rounded-full blur-3xl" />
+      <div className="bg-slate-900 p-10 rounded-[40px] border border-slate-800 shadow-2xl relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500 opacity-[0.1] rounded-full blur-3xl" />
         
-        <div className="relative z-10">
-          <div className="px-3 py-1 bg-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest inline-block mb-4">
-            Global Admin Access
-          </div>
-          <h1 className="text-5xl font-black italic tracking-tighter text-slate-900 uppercase leading-none">
-            VLV <span className="text-indigo-600">Control</span> Panel
-          </h1>
-          <p className="text-slate-400 font-medium mt-4 max-w-md">
-            Beheer alle organisaties en keur nieuwe aanvragen goed.
-          </p>
-        </div>
-
-        {/* STATS AREA */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
-          {[
-            { label: 'Totaal', value: stats.total, icon: Building2, color: 'text-slate-900' },
-            { label: 'Wachtend', value: stats.pending, icon: Clock, color: 'text-amber-500' },
-            { label: 'Actief', value: stats.active, icon: CheckCircle2, color: 'text-emerald-500' },
-          ].map((stat, i) => (
-            <div key={i} className="p-6 bg-slate-50/50 rounded-3xl border border-slate-100/50">
-              <div className="flex items-center gap-3 mb-2">
-                <stat.icon className={cn("w-4 h-4", stat.color)} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{stat.label}</span>
-              </div>
-              <p className={cn("text-3xl font-black", stat.color)}>{stat.value}</p>
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-4">
+            <div className="px-3 py-1 bg-indigo-500/20 text-indigo-400 rounded-full text-[10px] font-black uppercase tracking-widest inline-block border border-indigo-500/30">
+              System Administrator Access
             </div>
-          ))}
+            <h1 className="text-5xl font-black italic tracking-tighter text-white uppercase leading-none">
+              VLV <span className="text-indigo-400">Control</span> Panel
+            </h1>
+            <p className="text-slate-400 font-medium max-w-md">
+              Beveiligde omgeving voor het beheren van organisaties en het goedkeuren van nieuwe leden.
+            </p>
+          </div>
+
+          <div className="flex gap-4">
+            <div className="p-6 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-md">
+              <div className="flex items-center gap-3 mb-2">
+                <Clock className="w-4 h-4 text-amber-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Wachtend</span>
+              </div>
+              <p className="text-3xl font-black text-amber-500">{pendingCount}</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* ── FILTERS & LIST ── */}
+      {/* ── PENDING REQUESTS ── */}
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
-          <div className="relative w-full md:w-80 group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-indigo-500 transition-colors" />
-            <input 
-              type="text" 
-              placeholder="Zoek op naam of slug..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-100 bg-white focus:border-indigo-500 focus:ring-0 transition-all font-medium text-sm"
-            />
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-indigo-500" />
+            <h2 className="text-xl font-black italic uppercase tracking-tighter text-slate-900">Openstaande Aanvragen</h2>
           </div>
-
-          <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
-            {['all', 'pending', 'active', 'suspended'].map((s) => (
-              <button
-                key={s}
-                onClick={() => setFilterStatus(s)}
-                className={cn(
-                  "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                  filterStatus === s ? "bg-white text-indigo-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
-                )}
-              >
-                {s === 'all' ? 'Alle' : s}
-              </button>
-            ))}
-          </div>
+          {pendingCount > 0 && (
+            <span className="bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-full animate-pulse shadow-lg shadow-amber-500/20">
+              Actie Vereist
+            </span>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4">
-          {loading ? (
-            <div className="py-20 flex flex-col items-center gap-4 text-slate-300">
-              <Loader2 className="w-10 h-10 animate-spin" />
-              <p className="text-xs font-black uppercase tracking-widest">Organisaties laden...</p>
+        {pendingOrganizations.length === 0 ? (
+          <div className="py-24 bg-white rounded-[40px] border border-slate-100 border-dashed text-center flex flex-col items-center justify-center">
+            <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 mb-4 transition-transform group-hover:scale-110">
+              <CheckCircle2 className="w-10 h-10" />
             </div>
-          ) : filteredOrgs.length === 0 ? (
-            <div className="py-20 bg-white rounded-[40px] border border-slate-100 border-dashed text-center">
-              <Building2 className="w-12 h-12 text-slate-100 mx-auto mb-4" />
-              <p className="text-slate-400 font-medium">Geen organisaties gevonden.</p>
-            </div>
-          ) : (
-            <AnimatePresence mode="popLayout">
-              {filteredOrgs.map((org) => (
-                <motion.div 
-                  layout
-                  key={org.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white border border-slate-100 rounded-[32px] p-6 hover:shadow-xl hover:shadow-slate-200/50 transition-all group"
-                >
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-center gap-5">
-                      <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-colors">
-                        <Building2 className="w-7 h-7" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-3">
-                          <h3 className="text-lg font-black uppercase tracking-tight text-slate-900">{org.name}</h3>
-                          <span className={cn(
-                            "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                            org.status === 'active' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                            org.status === 'pending' ? "bg-amber-50 text-amber-600 border-amber-100" :
-                            "bg-red-50 text-red-600 border-red-100"
-                          )}>
-                            {org.status}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 mt-1">
-                          <p className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md truncate max-w-[200px]">{org.slug}</p>
-                          <span className="text-[10px] text-slate-300 flex items-center gap-1.5">
-                            <Clock className="w-3 h-3" />
-                            {new Date(org.created_at).toLocaleDateString('nl-BE')}
-                          </span>
-                          <span className="text-[10px] text-slate-300 flex items-center gap-1.5">
-                            <Users className="w-3 h-3" />
-                            {org.members?.length || 0} leden
-                          </span>
-                        </div>
-                      </div>
+            <p className="text-slate-400 font-black uppercase tracking-tighter text-lg">Geen lopende aanvragen</p>
+            <p className="text-slate-300 text-xs font-bold uppercase tracking-widest mt-1">Alle accounts zijn tot nu toe verwerkt.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {pendingOrganizations.map((org: any) => (
+              <div 
+                key={org.id} 
+                className="group bg-white p-8 rounded-[36px] border border-slate-100 shadow-sm hover:shadow-2xl hover:border-indigo-100 transition-all flex flex-col md:flex-row md:items-center gap-8 relative overflow-hidden"
+              >
+                {/* Accent line */}
+                <div className="absolute top-0 left-0 w-2 h-full bg-amber-500 opacity-20 group-hover:opacity-100 transition-opacity" />
+
+                <div className="flex-1 space-y-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-colors">
+                      <Building2 className="w-7 h-7" />
                     </div>
-
-                    <div className="flex items-center gap-3">
-                      {org.status === 'pending' ? (
-                        <button 
-                          onClick={() => handleUpdateStatus(org.id, 'active')}
-                          disabled={actionLoading === org.id}
-                          className="h-11 px-8 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center gap-2"
-                        >
-                          {actionLoading === org.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                          Goedkeuren
-                        </button>
-                      ) : org.status === 'active' ? (
-                        <button 
-                          onClick={() => handleUpdateStatus(org.id, 'suspended')}
-                          disabled={actionLoading === org.id}
-                          className="h-11 px-6 bg-amber-50 text-amber-600 border border-amber-100 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all flex items-center gap-2"
-                        >
-                          Suspend
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => handleUpdateStatus(org.id, 'active')}
-                          disabled={actionLoading === org.id}
-                          className="h-11 px-6 bg-white border border-slate-200 text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center gap-2"
-                        >
-                          Reactiveer
-                        </button>
-                      )}
-
-                      <button 
-                        onClick={() => handleImpersonate(org.id)}
-                        disabled={actionLoading === org.id}
-                        className="h-11 px-4 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
-                        title="Bekijk Werkruimte"
-                      >
-                        {actionLoading === org.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
-                        Bekijk
-                      </button>
-
-                      <button className="w-11 h-11 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-900 transition-colors">
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
+                    <div>
+                      <h3 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900 leading-none">{org.name}</h3>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em]">{org.slug}</span>
+                        <span className="w-1 h-1 rounded-full bg-slate-200" />
+                        <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest">Wacht op goedkeuring</span>
+                      </div>
                     </div>
                   </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-8 pt-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
+                        <UserCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Eigenaar</p>
+                        <p className="text-xs font-black text-slate-900">{org.owner_name}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
+                        <Mail className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">E-mail</p>
+                        <p className="text-xs font-black text-slate-900">{org.owner_email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 col-span-2">
+                      <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400">
+                        <Calendar className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Registratiedatum</p>
+                        <p className="text-xs font-black text-slate-900">
+                          {org.created_at ? format(new Date(org.created_at), 'd MMMM yyyy HH:mm', { locale: nl }) : 'Onbekend'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-100 pt-6 md:pt-0 md:pl-8 shrink-0">
+                  <button 
+                    disabled={isSaving}
+                    onClick={() => approveOrganization(org.id)}
+                    className="h-14 px-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center gap-3 transition-all shadow-xl shadow-emerald-500/20 disabled:opacity-50 active:scale-95"
+                  >
+                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                    Account Activeren
+                  </button>
+                  <button 
+                    onClick={() => handleImpersonate(org.id)}
+                    className="w-14 h-14 bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-2xl flex items-center justify-center transition-all"
+                    title="Bekijk Details"
+                  >
+                    <ExternalLink className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Footer Info */}
+      <div className="p-8 bg-indigo-50 rounded-3xl border border-indigo-100/50 flex items-center gap-4">
+        <AlertCircle className="w-6 h-6 text-indigo-500" />
+        <div className="space-y-1">
+          <p className="text-xs font-black text-indigo-900 uppercase tracking-tight">Beveiligde Database Verbinding</p>
+          <p className="text-[10px] font-medium text-indigo-600/70 uppercase tracking-widest">
+            Alle acties worden gelogd in de activity_logs voor audit doeleinden.
+          </p>
         </div>
       </div>
     </div>

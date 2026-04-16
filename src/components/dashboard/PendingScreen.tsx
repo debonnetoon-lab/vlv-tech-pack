@@ -31,8 +31,9 @@ export default function PendingScreen() {
         </h1>
         
         <p className="text-slate-500 font-medium mb-8 leading-relaxed">
-          Welkom bij VLV Tech Pack Builder. Je nieuwe werkruimte staat klaar, maar we controleren eerst even de configuratie. 
-          Je ontvangt een bericht zodra je aan de slag kunt.
+          Welkom bij VLV Tech Pack Builder. Je e-mail is succesvol bevestigd. 
+          Je werkruimte staat klaar, maar we wachten nu op de definitieve goedkeuring van <b>Toon</b>. 
+          Je ontvangt direct toegang zodra je account is geactiveerd.
         </p>
 
         <div className="space-y-4">

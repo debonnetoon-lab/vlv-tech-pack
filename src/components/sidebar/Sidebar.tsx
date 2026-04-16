@@ -30,7 +30,8 @@ export default function Sidebar() {
     activeCollectionId,
     activeArticleId,
     userRole,
-    isGlobalAdmin
+    isGlobalAdmin,
+    pendingCount
   } = useTechPackStore();
 
   const { isAdminDashboardOpen, setAdminDashboardOpen } = useUIStore();
@@ -283,7 +284,17 @@ export default function Sidebar() {
             >
               <ShieldCheck className={cn("w-5 h-5 shrink-0", isAdminDashboardOpen ? "text-white" : "text-indigo-400/60 group-hover:text-indigo-400")} />
               {!isCollapsed && (
-                <span className="text-xs uppercase tracking-widest leading-none mt-0.5 flex-1 text-left">Global Admin</span>
+                <div className="flex items-center justify-between flex-1">
+                  <span className="text-xs uppercase tracking-widest leading-none mt-0.5 text-left">Global Admin</span>
+                  {pendingCount > 0 && (
+                    <span className="bg-red-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full animate-pulse shadow-lg shadow-red-500/20">
+                      {pendingCount}
+                    </span>
+                  )}
+                </div>
+              )}
+              {isCollapsed && pendingCount > 0 && (
+                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-[#0b1912] animate-pulse" />
               )}
             </button>
           </div>

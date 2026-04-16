@@ -64,6 +64,8 @@ interface DataStore {
   isSaving: boolean;
   userRole: 'owner' | 'admin' | 'designer' | 'viewer' | null;
   isGlobalAdmin: boolean;
+  pendingOrganizations: any[];
+  pendingCount: number;
   
   repairOrganization: () => Promise<void>;
   fetchOrganization: () => Promise<void>;
@@ -78,6 +80,9 @@ interface DataStore {
   removeProduct: (collectionId: string, productId: string) => Promise<void>;
   removeCollection: (collectionId: string) => Promise<void>;
   duplicateProduct: (collectionId: string, productId: string) => Promise<void>;
+  fetchPendingOrganizations: () => Promise<void>;
+  approveOrganization: (orgId: string) => Promise<void>;
+  setupRealtimeNotifications: () => void;
   uploadProgress: number;
   uploadProductImage: (productId: string, file: File, view: ProductImage['view']) => Promise<string>;
   uploadPlacementArtwork: (productId: string, file: File, index: number) => Promise<string>;
@@ -98,6 +103,8 @@ export const useDataStore = create<DataStore>()(
       isSaving: false,
       userRole: null,
       isGlobalAdmin: false,
+      pendingOrganizations: [],
+      pendingCount: 0,
       uploadProgress: 0,
 
       setOrganization: (org: any | null) => set({ organization: org }),
@@ -129,6 +136,60 @@ export const useDataStore = create<DataStore>()(
         if (!organizationId) return;
         const { data } = await supabase.from('organizations').select('*').eq('id', organizationId).single();
         if (data) set({ organization: data });
+      },
+
+      fetchPendingOrganizations: async () => {
+        const { isGlobalAdmin } = getData();
+        if (!isGlobalAdmin) return;
+
+        const { data, error } = await supabase.rpc('get_pending_organizations');
+        if (!error && data) {
+          set({ 
+            pendingOrganizations: data,
+            pendingCount: data.length 
+          });
+        }
+      },
+
+      approveOrganization: async (orgId: string) => {
+        const { isGlobalAdmin } = getData();
+        if (!isGlobalAdmin) return;
+
+        const { error } = await supabase.rpc('approve_organization', { target_org_id: orgId });
+        if (!error) {
+          // Update local state
+          set((state) => ({
+            pendingOrganizations: state.pendingOrganizations.filter(o => o.id !== orgId),
+            pendingCount: Math.max(0, state.pendingCount - 1)
+          }));
+        } else {
+          alert("Goedkeuring mislukt: " + error.message);
+        }
+      },
+
+      setupRealtimeNotifications: () => {
+        const { isGlobalAdmin } = getData();
+        if (!isGlobalAdmin) return;
+
+        // Cleanup existing subscription if any
+        supabase.channel('pending-orgs').unsubscribe();
+
+        supabase
+          .channel('pending-orgs')
+          .on(
+            'postgres_changes',
+            { 
+              event: '*', 
+              schema: 'public', 
+              table: 'organizations',
+              filter: 'status=eq.pending'
+            },
+            () => {
+              // Re-fetch count/list when a pending org is added or updated back to pending
+              getData().fetchPendingOrganizations();
+            }
+          )
+          .subscribe();
       },
 
       logActivity: async (action, entityType, entityId, metadata) => {
@@ -228,8 +289,14 @@ export const useDataStore = create<DataStore>()(
         }
 
         // ── STEP 1b: Check for Global Admin (Toon) ──
-        const { data: globalAdminCheck } = await supabase.rpc('is_global_admin', { user_id: user.id });
-        set({ isGlobalAdmin: !!globalAdminCheck });
+        const { data: globalAdminCheck } = await supabase.rpc('is_global_admin', { u_id: user.id });
+        const isAdmin = !!globalAdminCheck;
+        set({ isGlobalAdmin: isAdmin });
+
+        if (isAdmin) {
+          await getData().fetchPendingOrganizations();
+          getData().setupRealtimeNotifications();
+        }
 
         // ── STEP 2: Load profile into collaboration store ──
         const { data: profileData } = await supabase
