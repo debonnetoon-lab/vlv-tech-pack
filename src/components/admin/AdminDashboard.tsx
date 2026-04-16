@@ -16,7 +16,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import { format } from "date-fns";
-import { nl } from "date-fns/locale";
+import { nl } from "date-fns/locale/nl";
 import { cn } from "@/lib/utils";
 
 export default function AdminDashboard() {
