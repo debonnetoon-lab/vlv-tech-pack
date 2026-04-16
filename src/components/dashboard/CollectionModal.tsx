@@ -30,13 +30,18 @@ export default function CollectionModal() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim()) {
-      await addCollection(name.trim(), { 
-        season: season || undefined, 
-        year, 
-        status 
-      });
-      setName("");
-      setCollectionModalOpen(false);
+      try {
+        await addCollection(name.trim(), { 
+          season: season || undefined, 
+          year, 
+          status 
+        });
+        setName("");
+        setCollectionModalOpen(false);
+      } catch (err: any) {
+        console.error("Unhandled error in CollectionModal:", err);
+        alert("Fatale crash bij opslaan collectie: " + err.message);
+      }
     }
   };
 

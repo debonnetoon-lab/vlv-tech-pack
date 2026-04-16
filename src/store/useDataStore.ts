@@ -423,9 +423,9 @@ export const useDataStore = create<DataStore>()(
         
         if (insertRes.error) {
           console.error("Error creating collection:", insertRes.error);
-          alert("Systeemfout bij opslaan: " + insertRes.error.message);
+          alert("Systeemfout bij het aanmaken van collectie: " + insertRes.error.message);
         } else if (insertRes.data) {
-          set((state) => ({ collections: [{ ...insertRes.data, products: [] }, ...state.collections] }));
+          set((state) => ({ collections: [{ ...insertRes.data, products: [] }, ...(state.collections || [])] }));
           logActivity('created', 'collection', insertRes.data.id, { name });
           useUIStore.getState().setCollectionModalOpen(false);
         }
@@ -433,32 +433,43 @@ export const useDataStore = create<DataStore>()(
 
       addProduct: async (collectionId: string, product: Partial<TechPackProduct>) => {
         const { organizationId, logActivity } = getData();
-        const user = useCollaborationStore.getState().user;
+        const { data: { user } } = await supabase.auth.getUser();
         if (!user || !organizationId) return;
 
         set({ isSaving: true });
-        const { data, error } = await supabase
-          .from('products')
-          .insert([{ 
-            collection_id: collectionId, 
-            organization_id: organizationId,
-            name: product.name || "Nieuw Product",
-            article_code: product.article_code || "",
-            status: "draft",
-            created_by: user.id
-          }])
-          .select()
-          .single();
+        
+        try {
+          const { data, error } = await supabase
+            .from('products')
+            .insert([{ 
+              collection_id: collectionId, 
+              organization_id: organizationId,
+              name: product.name || "Nieuw Product",
+              article_code: product.article_code || "",
+              status: "draft",
+              created_by: user.id
+            }])
+            .select()
+            .single();
 
-        set({ isSaving: false });
-        if (!error && data) {
-          set((state) => ({
-            collections: state.collections.map((col) =>
-              col.id === collectionId ? { ...col, products: [data, ...col.products] } : col
-            ),
-          }));
-          logActivity('created', 'product', data.id, { name: data.name });
-          useUIStore.getState().setActiveArticle(data.id);
+          set({ isSaving: false });
+          
+          if (error) {
+            console.error("Error creating product:", error);
+            alert("Fatale fout bij aanmaken product: " + error.message);
+          } else if (data) {
+            set((state) => ({
+              collections: (state.collections || []).map((col) =>
+                col.id === collectionId ? { ...col, products: [data, ...(col.products || [])] } : col
+              ),
+            }));
+            logActivity('created', 'product', data.id, { name: data.name });
+            useUIStore.getState().setActiveArticle(data.id);
+          }
+        } catch (err: any) {
+          set({ isSaving: false });
+          console.error("Unhandled error in addProduct:", err);
+          alert("Systeemfout: " + err.message);
         }
       },
 
