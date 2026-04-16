@@ -49,7 +49,7 @@ export default function StatsCards() {
       },
       { 
         label: "Exports", 
-        value: 24, // Mock for now, will connect to export_logs in Phase 5
+        value: 0, // Mock for now, will connect to export_logs in Phase 5
         icon: Download, 
         color: "bg-purple-500",
         trend: "ZIP/PDF/XLS"
