@@ -165,25 +165,46 @@ export default function Sidebar() {
                 ) : (
                   collections.map((col: any) => (
                     <div key={col.id}>
-                      <button
-                        onClick={() => {
-                          setActiveCollection(col.id);
-                          toggleCollection(col.id);
-                        }}
-                        className={cn(
-                          "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all",
-                          activeCollectionId === col.id
-                            ? "bg-white/10 text-white"
-                            : "text-white/30 hover:text-white/60 hover:bg-white/[0.03]"
+                      <div className="group/col relative flex items-center w-full">
+                        <button
+                          onClick={() => {
+                            setActiveCollection(col.id);
+                            toggleCollection(col.id);
+                          }}
+                          className={cn(
+                            "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-all",
+                            activeCollectionId === col.id
+                              ? "bg-white/10 text-white"
+                              : "text-white/30 hover:text-white/60 hover:bg-white/[0.03]"
+                          )}
+                        >
+                          <FolderKanban className="w-3.5 h-3.5 shrink-0 text-[#22c981]/40" />
+                          <span className="text-[11px] font-bold truncate flex-1">{col.name}</span>
+                          <ChevronRight className={cn(
+                            "w-3 h-3 shrink-0 transition-transform text-white/20",
+                            expandedCollections.includes(col.id) && "rotate-90"
+                          )} />
+                        </button>
+                        
+                        {!isViewer && (
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (window.confirm(`Weet je zeker dat je collectie "${col.name}" en al haar producten definitief wilt verwijderen?`)) {
+                                await useDataStore.getState().removeCollection(col.id);
+                                if (activeCollectionId === col.id) {
+                                  setActiveCollection(null);
+                                  setActiveArticle(null);
+                                }
+                              }
+                            }}
+                            title="Verwijder collectie"
+                            className="absolute right-8 top-1/2 -translate-y-1/2 opacity-0 group-hover/col:opacity-100 p-1.5 rounded-md text-red-500/50 hover:bg-red-500/10 hover:text-red-500 transition-all z-10"
+                          >
+                            <Plus className="w-3 h-3 rotate-45" />
+                          </button>
                         )}
-                      >
-                        <FolderKanban className="w-3.5 h-3.5 shrink-0 text-[#22c981]/40" />
-                        <span className="text-[11px] font-bold truncate flex-1">{col.name}</span>
-                        <ChevronRight className={cn(
-                          "w-3 h-3 shrink-0 transition-transform text-white/20",
-                          expandedCollections.includes(col.id) && "rotate-90"
-                        )} />
-                      </button>
+                      </div>
 
                       {/* Product sub-list */}
                       {expandedCollections.includes(col.id) && col.products?.length > 0 && (
@@ -206,19 +227,22 @@ export default function Sidebar() {
                                 <span className="text-[10px] font-medium truncate flex-1">{prod.name}</span>
                               </button>
                               
-                              {/* [NEW] Duplicate Action */}
+                              {/* Delete Action */}
                               {!isViewer && (
                                 <button
-                                  onClick={(e) => {
+                                  onClick={async (e) => {
                                     e.stopPropagation();
-                                    if (window.confirm(`Gooi dit artikel (${prod.name}) in de kopieermachine?`)) {
-                                      useDataStore.getState().duplicateProduct(col.id, prod.id);
+                                    if (window.confirm(`Weet je zeker dat je artikel "${prod.name}" wilt verwijderen?`)) {
+                                      await useDataStore.getState().removeProduct(col.id, prod.id);
+                                      if (activeArticleId === prod.id) {
+                                        setActiveArticle(null);
+                                      }
                                     }
                                   }}
-                                  title="Dupliceer artikel"
-                                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 p-1 rounded-md bg-[#22c981]/10 text-[#22c981] hover:bg-[#22c981] hover:text-[#0b1912] transition-all"
+                                  title="Verwijder artikel"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover/item:opacity-100 p-1 rounded-md text-red-500/50 hover:bg-red-500/10 hover:text-red-500 transition-all"
                                 >
-                                  <Plus className="w-2.5 h-2.5 rotate-45" /> {/* Using Plus rotated for a 'cross' or duplicate feel, or I can use Copy if I import it */}
+                                  <Plus className="w-2.5 h-2.5 rotate-45" /> 
                                 </button>
                               )}
                             </div>
