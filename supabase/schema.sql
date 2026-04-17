@@ -43,8 +43,7 @@ CREATE TABLE public.organization_members (
   role            TEXT CHECK (role IN ('owner','admin','designer','viewer')),
   invited_by      UUID REFERENCES auth.users(id),
   accepted_at     TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(organization_id, user_id)
+  created_at      TIMESTAMPTZ DEFAULT now()
 );
 
 -- ─────────────────────────────────────────────
@@ -232,37 +231,24 @@ DECLARE
   new_org_id UUID;
   org_name TEXT;
   full_name TEXT;
-  existing_org_id UUID;
 BEGIN
   full_name := COALESCE(NEW.raw_user_meta_data->>'full_name', SPLIT_PART(NEW.email, '@', 1));
   org_name := COALESCE(NEW.raw_user_meta_data->>'org_name', full_name || ' Workspace');
 
-  -- 1. Create/Update Profile
+  -- 1. Create Profile
   INSERT INTO public.profiles (id, full_name)
-  VALUES (NEW.id, full_name)
-  ON CONFLICT (id) DO UPDATE SET full_name = EXCLUDED.full_name;
+  VALUES (NEW.id, full_name);
 
-  -- 2. Check if user already has an organization (e.g. invited before signup)
-  SELECT organization_id INTO existing_org_id 
-  FROM public.organization_members 
-  WHERE user_id = NEW.id 
-  LIMIT 1;
-
-  IF existing_org_id IS NOT NULL THEN
-    -- User already belongs to an org, don't create a new one
-    RETURN NEW;
-  END IF;
-
-  -- 3. Create Organization
-  INSERT INTO public.organizations (name, slug, status)
-  VALUES (org_name, LOWER(REGEXP_REPLACE(org_name, '\s+', '-', 'g')) || '-' || SUBSTRING(gen_random_uuid()::text, 1, 8), 'active')
+  -- 2. Create Organization
+  INSERT INTO public.organizations (name, slug)
+  VALUES (org_name, LOWER(REGEXP_REPLACE(org_name, '\s+', '-', 'g')) || '-' || SUBSTRING(gen_random_uuid()::text, 1, 8))
   RETURNING id INTO new_org_id;
 
-  -- 4. Add user as Owner
+  -- 3. Add user as Owner
   INSERT INTO public.organization_members (organization_id, user_id, role)
   VALUES (new_org_id, NEW.id, 'owner');
 
-  -- 5. Log Activity
+  -- 4. Log Activity (V3 Adjustment)
   INSERT INTO public.activity_logs (organization_id, user_id, action, entity_type, entity_id)
   VALUES (new_org_id, NEW.id, 'created', 'organization', new_org_id);
 
@@ -394,19 +380,17 @@ DECLARE
   v_org_name TEXT;
   v_slug TEXT;
 BEGIN
-  -- 1. Check if user already has an ACTIVE org (Prioritize active over pending)
-  SELECT m.organization_id INTO v_org_id
-  FROM public.organization_members m
-  JOIN public.organizations o ON o.id = m.organization_id
-  WHERE m.user_id = auth.uid()
-  ORDER BY (o.status = 'active') DESC, m.created_at ASC
+  -- Check if user already has an org
+  SELECT organization_id INTO v_org_id
+  FROM public.organization_members
+  WHERE user_id = auth.uid()
   LIMIT 1;
 
   IF v_org_id IS NOT NULL THEN
     RETURN v_org_id;
   END IF;
 
-  -- 2. Get user info
+  -- Get user info
   SELECT COALESCE(raw_user_meta_data->>'full_name', split_part(email, '@', 1))
   INTO v_full_name
   FROM auth.users WHERE id = auth.uid();
@@ -435,7 +419,6 @@ BEGIN
   RETURN v_org_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
-
 -- ─────────────────────────────────────────────
 --  6. POLICIES (RBAC ENFORCED)
 -- ─────────────────────────────────────────────
