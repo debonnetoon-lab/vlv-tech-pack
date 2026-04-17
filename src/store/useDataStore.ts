@@ -255,37 +255,52 @@ export const useDataStore = create<DataStore>()(
         let orgId = getData().organizationId;
         
         if (!orgId) {
-          const { data, error: rpcError } = await supabase.rpc('ensure_user_organization');
-          if (!rpcError && data) {
-            orgId = data;
+          // ── STEP 1: Attempt to fetch the most relevant organization ──
+          // We prioritize 'active' organizations over 'pending' ones.
+          const { data: memberships, error: memError } = await supabase
+            .from('organization_members')
+            .select('organization_id, organizations(status, name), role')
+            .eq('user_id', user.id)
+            .order('role', { ascending: true }); // 'owner' comes before 'admin' alphabetically? No, let's use status.
+          
+          if (memberships && memberships.length > 0) {
+            // Sort manually to ensure 'active' comes first
+            const sorted = [...memberships].sort((a: any, b: any) => {
+              if (a.organizations?.status === 'active' && b.organizations?.status !== 'active') return -1;
+              if (a.organizations?.status !== 'active' && b.organizations?.status === 'active') return 1;
+              return 0;
+            });
+            
+            orgId = sorted[0].organization_id;
+            set({ 
+              organizationId: orgId, 
+              organization: sorted[0].organizations,
+              userRole: sorted[0].role as any 
+            });
           } else {
-            // Fallback: Check organization_members without .single() to avoid PGRST116 errors on multiple rows
-            const { data: mems } = await supabase
-              .from('organization_members')
-              .select('organization_id')
-              .eq('user_id', user.id)
-              .limit(1);
-            if (mems && mems.length > 0) {
-              orgId = mems[0].organization_id;
+            // Fallback for brand new users
+            const { data: rpcData, error: rpcError } = await supabase.rpc('ensure_user_organization');
+            if (!rpcError && rpcData) {
+              orgId = rpcData;
             }
           }
         }
 
         if (orgId) {
           set({ organizationId: orgId });
-          // Also fetch the full organization object (avoiding single just in case)
-          const { data: orgs } = await supabase.from('organizations').select('*').eq('id', orgId).limit(1);
-          if (orgs && orgs.length > 0) set({ organization: orgs[0] });
-
-          // Fetch user role for this org (avoiding single)
-          const { data: mems } = await supabase
-            .from('organization_members')
-            .select('role')
-            .eq('organization_id', orgId)
-            .eq('user_id', user.id)
-            .limit(1);
-          
-          if (mems && mems.length > 0) set({ userRole: mems[0].role as any });
+          // Ensure we have the full organization and role if not set above
+          if (!getData().organization || !getData().userRole) {
+            const { data: orgData } = await supabase.from('organizations').select('*').eq('id', orgId).single();
+            const { data: profileMember } = await supabase
+              .from('organization_members')
+              .select('role')
+              .eq('organization_id', orgId)
+              .eq('user_id', user.id)
+              .single();
+            
+            if (orgData) set({ organization: orgData });
+            if (profileMember) set({ userRole: profileMember.role as any });
+          }
         }
 
         // ── STEP 1b: Check for Global Admin (Toon) ──
